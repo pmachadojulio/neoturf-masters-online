@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NEO TURF MASTERS — Núcleo fiel arcade (prototipo)</title>
+<style>
+  *{box-sizing:border-box} body{margin:0;background:#06130b;color:#fff;font-family:"Courier New",monospace}
+  #top{display:flex;gap:10px;align-items:center;justify-content:center;padding:8px;background:#0d2b16;border-bottom:3px solid #ffd23f;flex-wrap:wrap}
+  .tag{background:#123c1f;border:2px solid #ffd23f;border-radius:6px;padding:2px 10px;font-weight:bold}
+  #windArrow{display:inline-block;transition:transform .3s}
+  #wrap{display:flex;justify-content:center;padding:8px}
+  canvas{background:#1d6b2a;border:4px solid #0a1f10;border-radius:8px;max-width:97vw;height:auto;image-rendering:auto}
+  #help{text-align:center;font-size:13px;opacity:.9;padding:6px}
+  kbd{background:#222;border:1px solid #888;border-radius:4px;padding:0 5px}
+</style>
+</head>
+<body>
+<div id="top">
+  <span class="tag" id="hudHole">1st HOLE · PAR 4</span>
+  <span class="tag">⛳ <span id="hudGolfer">YOUNG HERO</span></span>
+  <span class="tag">WIND <span id="windArrow">➤</span> <span id="hudWind">5 mph</span></span>
+  <span class="tag">STROKE <span id="hudStroke">0</span></span>
+  <span class="tag" id="hudClub">1 WOOD · 270y</span>
+  <span class="tag" id="hudMsg">···</span>
+</div>
+<div id="wrap"><canvas id="game" width="960" height="540"></canvas></div>
+<div id="help">
+  <kbd>1</kbd>-<kbd>6</kbd> golfista ·
+  <kbd>←</kbd><kbd>→</kbd> apuntar · <kbd>↑</kbd><kbd>↓</kbd> palo ·
+  <kbd>Z</kbd> hook / <kbd>X</kbd> slice ·
+  <kbd>ESPACIO</kbd>×3: iniciar → potencia → altura ·
+  <kbd>R</kbd> auto-apuntar · En green: putting con guideline
+</div>
+<script>
+'use strict';
+/* =====================================================================
+   NEO TURF MASTERS (SNK/Nazca 1996) — núcleo jugable fiel, single-file
+   Hallazgos de la investigación (agent-reach: Exa + web):
+   - Swing de 2 metros: POWER (TAP1 inicia, TAP2 fija) + HEIGHT (aguja
+     oscilante, TAP3 fija). Hook/Slice con B/C ANTES del swing.
+   - 6 golfistas × 5 stats: Driving/Accuracy/Skill/Recovery/Putting.
+   - Palos auto-seleccionados por distancia; >100% posible (Power).
+   - En green: modo putting con flechas de slope + guideline de potencia.
+   - Rough/sand aceleran los metros y agrandan la zona roja de MISS.
+   ===================================================================== */
+
+// ---------- 1. DATOS ----------
+const GOLFERS = [
+  {id:'hero',  name:'YOUNG HERO',  ctry:'USA', drv:3, acc:3, skl:3, rec:3, put:3},
+  {id:'tech',  name:'TECHNICIAN',  ctry:'UK',  drv:2, acc:4, skl:5, rec:4, put:3},
+  {id:'vet',   name:'VETERAN',     ctry:'AUS', drv:1, acc:2, skl:4, rec:5, put:2},
+  {id:'maker', name:'SHOT MAKER',  ctry:'GER', drv:4, acc:5, skl:2, rec:2, put:4},
+  {id:'power', name:'POWER GOLFER',ctry:'BRA', drv:5, acc:1, skl:1, rec:1, put:1},
+  {id:'putt',  name:'PUTT MASTER', ctry:'JPN', drv:3, acc:2, skl:4, rec:2, put:5},
+];
+const CLUBS = [
+  {id:'1W', name:'1 WOOD', max:270, loft:12},
+  {id:'3W', name:'3 WOOD', max:240, loft:16},
+  {id:'5I', name:'5 IRON', max:200, loft:24},
+  {id:'7I', name:'7 IRON', max:165, loft:32},
+  {id:'9I', name:'9 IRON', max:135, loft:40},
+  {id:'PW', name:'WEDGE',  max:100, loft:52},
+  {id:'SW', name:'SAND WEDGE', max:75, loft:56},
+  {id:'PT', name:'PUTTER', max:30,  loft:4},
+];
+// Hoyos (yardas, mundo 2D: x=adelante, y=lateral). Inspiración arcade: doglegs,
+// arboles castigadores, bunkers y agua. Green con tilt (pendiente) propio.
+const HOLES = [
+  {par:4, tee:{x:0,y:0}, pin:{x:390,y:30}, fairwayW:46,
+   green:{rx:20,ry:15,tilt:{x:0.55,y:-0.35}},
+   bunkers:[{x:300,y:-18,rx:16,ry:9},{x:352,y:52,rx:14,ry:8}],
+   water:[{x:200,y:70,rx:70,ry:26}], trees:[{x:150,y:-55},{x:250,y:60},{x:330,y:-45},{x:120,y:50}]},
+  {par:3, tee:{x:0,y:0}, pin:{x:175,y:-20}, fairwayW:40,
+   green:{rx:16,ry:13,tilt:{x:-0.5,y:0.45}},
+   bunkers:[{x:150,y:2,rx:18,ry:10},{x:190,y:-42,rx:12,ry:7}],
+   water:[], trees:[{x:90,y:45},{x:210,y:35}]},
+  {par:5, tee:{x:0,y:0}, pin:{x:520,y:-40}, fairwayW:50,
+   green:{rx:21,ry:15,tilt:{x:0.3,y:0.6}},
+   bunkers:[{x:400,y:-70,rx:16,ry:9},{x:480,y:-8,rx:15,ry:8},{x:540,y:-60,rx:13,ry:7}],
+   water:[{x:320,y:40,rx:60,ry:24}], trees:[{x:180,y:-60},{x:300,y:-55},{x:450,y:45},{x:560,y:10}]},
+];
+
+// ---------- 2. ESTADO ----------
+const cv = document.getElementById('game'), ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const G = {
+  screen:'select',            // select | play
+  gi:0, holeIndex:0, stroke:0, total:0,
+  ball:{x:0,y:0}, prev:{x:0,y:0}, lastSafe:{x:0,y:0},
+  aim:0, clubIndex:0, curve:0, // curve: -1 hook .. +1 slice (B/C)
+  wind:{ang:0.5, mph:6},
+  meter:null,                 // {phase:'power'|'height', p, dir, power}
+  flight:null, roll:null, putt:null,
+  msg:'Elige golfista (1-6)', cam:{x:100,y:0,viewW:260},
+};
+const golfer = ()=>GOLFERS[G.gi];
+const hole = ()=>HOLES[G.holeIndex];
+
+// stat → efectos
+const meterSpeed = lie => (1.55 - golfer().acc*0.17) * (lie==='fairway'||lie==='tee'?1 : lie==='green'?0.85 : lie==='rough'?1.45 : 1.8);
+const heightSweet = ()=> 0.09 + golfer().skl*0.028;              // semi-ancho zona blanca
+const redZone = lie => Math.max(0.01,(lie==='sand'?0.30 : lie==='rough'?0.17 : 0.055) - golfer().rec*0.028);
+const driveScale = ()=> 0.86 + golfer().drv*0.05;                // drv5→1.11 (>100% real)
+const powerCap = ()=> golfer().drv>=5?1.14 : golfer().drv>=4?1.06 : 1.0;
+
+// ---------- 3. TERRENO ----------
+const d2=(ax,ay,bx,by)=>Math.hypot(bx-ax,by-ay);
+function inEllipse(x,y,e){return ((x-e.x)/e.rx)**2+((y-e.y)/e.ry)**2<1;}
+function fairwayDist(x,y){
+  const h=hole();
+  const t=Math.max(0,Math.min(1,((x-h.tee.x)*(h.pin.x-h.tee.x)+(y-h.tee.y)*(h.pin.y-h.tee.y))/((d2(h.tee.x,h.tee.y,h.pin.x,h.pin.y)**2)||1)));
+  return d2(x,y,h.tee.x+(h.pin.x-h.tee.x)*t,h.tee.y+(h.pin.y-h.tee.y)*t);
+}
+function onGreen(x,y){const h=hole();return ((x-h.pin.x)/h.green.rx)**2+((y-h.pin.y)/h.green.ry)**2<1;}
+function lieAt(x,y){
+  const h=hole();
+  if(d2(x,y,h.tee.x,h.tee.y)<4) return 'tee';
+  for(const b of h.bunkers) if(inEllipse(x,y,b)) return 'sand';
+  for(const w of h.water) if(inEllipse(x,y,w)) return 'water';
+  if(onGreen(x,y)) return 'green';
+  if(fairwayDist(x,y)<h.fairwayW/2) return 'fairway';
+  return 'rough';
+}
+function slopeAt(x,y){ // tilt del green + micro-relieve fuera (0)
+  if(!onGreen(x,y)) return {x:0,y:0};
+  const t=hole().green.tilt, m=0.9;
+  return {x:t.x*m, y:t.y*m};
+}
+function distToPin(x,y){const h=hole();return d2(x,y,h.pin.x,h.pin.y);}
+
+// ---------- 4. SELECCIÓN DE PALO ----------
+function autoClub(){
+  const d=distToPin(G.ball.x,G.ball.y);
+  if(onGreen(G.ball.x,G.ball.y)) return 7;
+  const order=[0,1,2,3,4,5];
+  for(let i=order.length-1;i>=0;i--){
+    if(d<=CLUBS[order[i]].max*driveScale()*1.02) { /* candidate */ }
+  }
+  for(const i of order){ if(d<=CLUBS[i].max*driveScale()*1.02) return i; }
+  return 0;
+}
+
+// ---------- 5. MÁQUINA DE ESTADOS DEL SWING (triple tap) ----------
+function startSwing(){
+  if(G.meter||G.flight||G.roll||G.putt||G.screen!=='play') return;
+  const lie=lieAt(G.ball.x,G.ball.y);
+  if(lie==='water') return;
+  G.meter={phase:'power',p:0,dir:1,power:0,lie};
+  setMsg(lie==='green'?'PUTTING: fija la potencia en la guía':'POWER: ¡fija con ESPACIO!');
+}
+function tapMeter(){
+  const m=G.meter; if(!m) return startSwing();
+  if(m.phase==='power'){
+    m.power=Math.min(m.p,powerCap());
+    if(onGreen(G.ball.x,G.ball.y)){ doPutt(m.power); G.meter=null; return; } // putt: 2 taps
+    m.phase='height'; m.p=0.5; m.dir=Math.random()<0.5?-1:1;
+    setMsg('HEIGHT: ¡clava el centro blanco!');
+  } else {
+    doShot(m.power,m.p); G.meter=null;
+  }
+}
+/* Matemática del tiro (documentada):
+   Rango nominal  R = effMax · power · hFactor
+   v0 por fórmula de alcance: R = v0²·sin(2θ)/g  →  v0 = √(R·g/sin(2θ))
+   Integración por frame:
+     vx = v0·cosθ·cos(aim) ,  vy = v0·cosθ·sin(aim)
+     x += (vx + Wx·k)·dt ,  y += (vy + Wy·k)·dt + curve·c·t   (hook/slice)
+     h += vh·dt − g·dt² ,   vh −= g·dt
+   W = viento mph→yd/s (k≈1.1): un viento de 10 mph mueve ~12y al driver.
+   hFactor (1.15 alto … 0.8 bajo) y error lateral salen del HEIGHT meter;
+   zona roja = MISS (whiff, +1 golpe). */
+function doShot(power,hPos){
+  const g=golfer(), club=CLUBS[G.clubIndex], lie=G.meter.lie;
+  const sw=heightSweet(), rz=redZone(lie);
+  if(hPos<rz||hPos>1-rz){ // ¡MISS! (real: swing en vacío, +1 stroke)
+    G.stroke++; setMsg('¡MISS! El palo abanica el aire (+1)'); updateHUD(); snd(false); return;
+  }
+  const off=Math.abs(hPos-0.5);              // 0 = perfecto
+  const perfect=off<sw;
+  const hFactor=1.12-(hPos*0.45);            // alto(izq)=más carry+spin, bajo=raso
+  const errLat=(off-sw>0?(off-sw):0)*46*(6-g.acc)*0.35*(lie==='fairway'?1:lie==='tee'?1:1.8);
+  const errDir=(hPos>0.5?1:-1);
+  const effMax=club.max*driveScale();
+  const R=Math.max(4,effMax*power*hFactor*(perfect?1.02:1-(off*0.25)));
+  const th=club.loft*Math.PI/180, gv=30;
+  const v0=Math.sqrt(Math.max(1,R*gv/Math.max(0.12,Math.sin(2*th))));
+  const curveCmd=G.curve; // B/C pre-seleccionado
+  G.prev={...G.ball}; G.lastSafe={...G.ball};
+  G.flight={x:G.ball.x,y:G.ball.y,vx:v0*Math.cos(th)*Math.cos(G.aim),vy:v0*Math.cos(th)*Math.sin(G.aim),
+    vh:v0*Math.sin(th),t:0,curve:(curveCmd*9*(0.4+power))+(perfect?0:errDir*errLat*0.12),
+    wx:Math.cos(G.wind.ang)*G.wind.mph*1.1,wy:Math.sin(G.wind.ang)*G.wind.mph*1.1,
+    trail:[],R,perfect,club:club.id};
+  G.stroke++;
+  if(perfect){setMsg('¡NICE SHOT!');} else setMsg(`${club.name} · ${R.toFixed(0)}y`);
+  snd(perfect); updateHUD();
+}
+function doPutt(power){
+  const need=puttNeed(); // potencia ideal 0..1
+  const jitter=(Math.abs(power-need))*1.4;
+  const errLat=(power-need)*40 + (Math.random()-0.5)*(6-golfer().put)*1.1;
+  const a=G.aim+errLat*0.004;
+  const v=6+power*46; // yd/s iniciales
+  G.prev={...G.ball};
+  G.putt={x:G.ball.x,y:G.ball.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,t:0};
+  G.stroke++; setMsg(power<=need*1.15&&power>=need*0.85?'Buen toque…':'¡Atento a la caída!');
+  updateHUD();
+}
+function puttNeed(){ // guideline: distancia/alcance ajustada por pendiente a favor/en contra
+  const d=distToPin(G.ball.x,G.ball.y);
+  const s=slopeAt(G.ball.x,G.ball.y);
+  const along=Math.cos(G.aim)*s.x+Math.sin(G.aim)*s.y; // + a favor
+  return Math.max(0.05,Math.min(1,(d/CLUBS[7].max)-along*0.12));
+}
+
+// ---------- 6. FÍSICA POR FRAME ----------
+function stepFlight(dt){
+  const f=G.flight; f.t+=dt;
+  const n=3; // substeps para estabilidad
+  for(let i=0;i<n;i++){
+    const h=dt/n;
+    f.vy+=f.curve*h*0.55;              // Magnus hook/slice
+    f.x+=(f.vx+f.wx)*h*0.14; f.y+=(f.vy+f.wy)*h*0.14;
+    f.vh-=30*h; f.h=(f.h||0)+f.vh*h;
+    if(f.h<=0){f.h=0;land();return;}
+  }
+  f.trail.push({x:f.x,y:f.y});
+  if(f.trail.length>60)f.trail.shift();
+  G.ball.x=f.x;G.ball.y=f.y;G.ball.h=f.h;
+}
+function land(){
+  const f=G.flight; G.flight=null;
+  let {x,y}=f; const lie=lieAt(x,y);
+  if(lie==='water'){G.stroke++;G.ball={...G.lastSafe};setMsg('¡Al agua! Penalidad +1, drop');updateHUD();autoAimClub();return;}
+  if(Math.abs(x)>80||Math.abs(x-300)>420||Math.abs(y)>220){G.stroke++;G.ball={...G.lastSafe};setMsg('¡Fuera de límites! +1');updateHUD();autoAimClub();return;}
+  // rodadura: conserva según lie
+  const keep=lie==='fairway'?0.35:lie==='green'?0.5:lie==='tee'?0.3:lie==='rough'?0.08:0.0;
+  const sp=Math.hypot(f.vx,f.vy)*0.14*keep;
+  const a=Math.atan2(f.vy,f.vx);
+  G.roll={x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,spin:f.perfect?2:0};
+  G.ball.h=0;
+}
+function stepRoll(dt){
+  const r=G.roll, lie=lieAt(r.x,r.y);
+  const fr=lie==='green'?7:lie==='fairway'?16:lie==='rough'?34:60; // fricción yd/s²
+  const s=slopeAt(r.x,r.y);
+  r.vx+=(s.x*6-r.vx*0.02)*dt*3; r.vy+=(s.y*6-r.vy*0.02)*dt*3;
+  const sp=Math.hypot(r.vx,r.vy), dec=fr*dt;
+  if(sp<=Math.max(0.6,dec)){G.roll=null;G.ball.x=r.x;G.ball.y=r.y;settle();return;}
+  r.vx-=r.vx/sp*dec; r.vy-=r.vy/sp*dec;
+  r.x+=r.vx*dt; r.y+=r.vy*dt;
+  if(lieAt(r.x,r.y)==='water'){G.stroke++;G.roll=null;G.ball={...G.lastSafe};setMsg('¡Rueda al agua! +1');updateHUD();}
+  G.ball.x=r.x;G.ball.y=r.y;
+}
+function stepPutt(dt){
+  const p=G.putt, s=slopeAt(p.x,p.y);
+  p.vx+=s.x*10*dt; p.vy+=s.y*10*dt;      // la pendiente manda (leer flechas)
+  const fr=8.5*dt, sp=Math.hypot(p.vx,p.vy);
+  if(sp<=Math.max(0.4,fr)){G.putt=null;G.ball.x=p.x;G.ball.y=p.y;settle();return;}
+  p.vx-=p.vx/sp*fr; p.vy-=p.vy/sp*fr;
+  p.x+=p.vx*dt; p.y+=p.vy*dt;
+  if(!onGreen(p.x,p.y)&&lieAt(p.x,p.y)!=='green'){/* se sale: sigue como roll */}
+  G.ball.x=p.x;G.ball.y=p.y;
+}
+function settle(){
+  const d=distToPin(G.ball.x,G.ball.y);
+  if(d<1.4){ // ¡embocada!
+    G.total+=G.stroke;
+    setMsg(`¡HOYO! ${G.stroke} golpes (Par ${hole().par}) — ESPACIO para seguir`);
+    G.holed=true; updateHUD(); snd(true); return;
+  }
+  autoAimClub();
+}
+function autoAimClub(){
+  const h=hole();
+  G.aim=Math.atan2(h.pin.y-G.ball.y,h.pin.x-G.ball.x);
+  G.clubIndex=autoClub(); G.curve=0; updateHUD();
+}
+function nextHole(){
+  G.holeIndex=(G.holeIndex+1)%HOLES.length; G.stroke=0; G.holed=false;
+  const h=hole(); G.ball={x:h.tee.x,y:h.tee.y}; G.prev={...G.ball}; G.lastSafe={...G.ball};
+  G.wind={ang:Math.random()*Math.PI*2,mph:2+Math.random()*11};
+  autoAimClub();
+  setMsg(h.par===3?'Par 3 · ¡a por el green!':'¡Buen drive!');
+}
+
+// ---------- 7. INPUT ----------
+document.addEventListener('keydown',e=>{
+  if(e.repeat&&e.code!=='ArrowLeft'&&e.code!=='ArrowRight')return;
+  const k=e.code;
+  if(G.screen==='select'){
+    if(k.startsWith('Digit')){const n=+k.slice(5);if(n>=1&&n<=6){G.gi=n-1;beginPlay();}}
+    if(k==='Space'||k==='Enter'){e.preventDefault();beginPlay();}
+    return;
+  }
+  if(k==='ArrowLeft'){G.aim-=0.028;}
+  else if(k==='ArrowRight'){G.aim+=0.028;}
+  else if(k==='ArrowUp'){e.preventDefault();G.clubIndex=Math.max(0,G.clubIndex-1);updateHUD();}
+  else if(k==='ArrowDown'){e.preventDefault();G.clubIndex=Math.min(6,G.clubIndex+1);updateHUD();}
+  else if(k==='KeyZ'){G.curve=-1;setMsg('HOOK armado (B) — curva a la izquierda');}
+  else if(k==='KeyX'){G.curve=1;setMsg('SLICE armado (C) — curva a la derecha');}
+  else if(k==='KeyC'){G.curve=0;setMsg('Tiro recto');}
+  else if(k==='KeyR'){autoAimClub();}
+  else if(k==='Space'){e.preventDefault();
+    if(G.holed){nextHole();return;}
+    tapMeter();
+  }
+});
+cv.addEventListener('click',()=>{if(G.screen==='select')beginPlay();else if(G.holed)nextHole();else tapMeter();});
+cv.addEventListener('mousemove',e=>{
+  if(G.meter||G.flight||G.screen!=='play')return;
+  const r=cv.getBoundingClientRect();
+  const mx=(e.clientX-r.left)*(W/r.width),my=(e.clientY-r.top)*(H/r.height);
+  const s=w2s(G.ball.x,G.ball.y);
+  G.aim=Math.atan2((my-s.y)/s.k,(mx-s.x)/s.k);
+});
+function beginPlay(){
+  G.screen='play';G.holeIndex=0;G.stroke=0;G.total=0;G.holed=false;
+  const h=hole();G.ball={x:h.tee.x,y:h.tee.y};G.prev={...G.ball};G.lastSafe={...G.ball};
+  G.wind={ang:Math.random()*Math.PI*2,mph:2+Math.random()*11};
+  autoAimClub();setMsg('¡Hoyito 1! Z=hook X=slice, ESPACIO para el swing');
+}
+
+// ---------- 8. CÁMARA + RENDER ----------
+function camTarget(){
+  let fx=G.ball.x,fy=G.ball.y,vw=260;
+  if(G.flight){fx=(G.ball.x+hole().pin.x)/2;fy=(G.ball.y+hole().pin.y)/2;vw=Math.max(260,d2(G.ball.x,G.ball.y,hole().pin.x,hole().pin.y)+120);}
+  else if(onGreen(G.ball.x,G.ball.y)||G.putt){fx=hole().pin.x;fy=hole().pin.y;vw=64;}
+  else{const d=distToPin(G.ball.x,G.ball.y);vw=Math.max(150,Math.min(460,d+130));fx=G.ball.x+d*0.18;fy=G.ball.y;}
+  const c=G.cam,k=0.08;c.x+=(fx-c.x)*k;c.y+=(fy-c.y)*k;c.viewW+=(vw-c.viewW)*k;
+}
+function w2s(x,y){const k=W/G.cam.viewW;return{x:(x-G.cam.x)*k+W/2,y:(y-G.cam.y)*k+H/2,k};}
+function draw(){
+  camTarget();
+  // césped base con franjas arcade
+  const grd=ctx.createLinearGradient(0,0,0,H);grd.addColorStop(0,'#2f9e44');grd.addColorStop(1,'#237a33');
+  ctx.fillStyle=grd;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#ffffff08';
+  for(let i=0;i<12;i++)ctx.fillRect(0,i*48,W,22);
+  const h=hole();
+  // fairway (cápsula tee→pin)
+  ctx.strokeStyle='#57c465';ctx.lineCap='round';ctx.lineWidth=(h.fairwayW*2)*(W/G.cam.viewW);
+  ctx.beginPath();const a=w2s(h.tee.x,h.tee.y),b=w2s(h.pin.x,h.pin.y);ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  ctx.strokeStyle='#6bd877';ctx.lineWidth=(h.fairwayW*1.2)*(W/G.cam.viewW);
+  ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  // agua
+  for(const wt of h.water){const p=w2s(wt.x,wt.y),k=p.k;ctx.fillStyle='#2f9fd8';
+    ctx.beginPath();ctx.ellipse(p.x,p.y,wt.rx*k,wt.ry*k,0,0,7);ctx.fill();
+    ctx.fillStyle='#ffffff55';ctx.beginPath();ctx.ellipse(p.x-wt.rx*k*0.2,p.y-wt.ry*k*0.25,wt.rx*k*0.5,wt.ry*k*0.18,-0.2,0,7);ctx.fill();}
+  // green
+  {const p=w2s(h.pin.x,h.pin.y),k=p.k;
+   const gg=ctx.createRadialGradient(p.x,p.y,2,p.x,p.y,h.green.rx*k);
+   gg.addColorStop(0,'#71e07f');gg.addColorStop(1,'#3aa34c');
+   ctx.fillStyle=gg;ctx.beginPath();ctx.ellipse(p.x,p.y,h.green.rx*k,h.green.ry*k,0,0,7);ctx.fill();
+   // flechas de slope (lectura del green, animadas)
+   const t=performance.now()/400;
+   ctx.font=`${Math.max(10,11*k*0.12)}px monospace`;ctx.textAlign='center';
+   for(let gx=-2;gx<=2;gx++)for(let gy=-1;gy<=1;gy++){
+     const wx=h.pin.x+gx*6,wy=h.pin.y+gy*6,s=slopeAt(wx,wy);
+     const sp=w2s(wx,wy),mg=Math.hypot(s.x,s.y);
+     if(mg<0.05)continue;
+     const an=Math.atan2(s.y,s.x);
+     const off=(t*8+ (gx*3+gy*5))%10;
+     ctx.fillStyle=mg>0.6?'#ff5252':'#fff';
+     const ax=sp.x+Math.cos(an)*off*sp.k*0.12,ay=sp.y+Math.sin(an)*off*sp.k*0.12;
+     ctx.save();ctx.translate(ax,ay);ctx.rotate(an);ctx.fillText('➤',0,4);ctx.restore();
+   }
+   ctx.textAlign='left';}
+  // bunkers
+  for(const bn of h.bunkers){const p=w2s(bn.x,bn.y),k=p.k;
+    ctx.fillStyle='#ecd88f';ctx.beginPath();ctx.ellipse(p.x,p.y,bn.rx*k,bn.ry*k,0,0,7);ctx.fill();
+    ctx.fillStyle='#d9bd6a';ctx.beginPath();ctx.ellipse(p.x,p.y,bn.rx*k*0.8,bn.ry*k*0.75,0,0,7);ctx.fill();}
+  // árboles
+  for(const tr of h.trees){const p=w2s(tr.x,tr.y),k=p.k,r=Math.max(4,13*k);
+    ctx.fillStyle='#00000055';ctx.beginPath();ctx.ellipse(p.x+2,p.y+3,r,r*0.4,0,0,7);ctx.fill();
+    ctx.fillStyle='#14521f';ctx.beginPath();ctx.arc(p.x,p.y,r,0,7);ctx.fill();
+    ctx.fillStyle='#2f9e44';ctx.beginPath();ctx.arc(p.x-r*0.25,p.y-r*0.25,r*0.6,0,7);ctx.fill();}
+  // tee + pin + bandera
+  {const p=w2s(h.tee.x,h.tee.y);ctx.fillStyle='#fff';ctx.fillRect(p.x-3,p.y-3,6,6);
+   const q=w2s(h.pin.x,h.pin.y);ctx.fillStyle='#111';ctx.beginPath();ctx.arc(q.x,q.y,Math.max(3,4*q.k*0.2),0,7);ctx.fill();
+   ctx.strokeStyle='#d00';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(q.x,q.y-34);ctx.stroke();
+   ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(q.x,q.y-34);ctx.lineTo(q.x+20,q.y-28);ctx.lineTo(q.x,q.y-22);ctx.fill();}
+  // estela + bola (sombra separada por altura → se lee el vuelo parabólico)
+  if(G.flight&&G.flight.trail.length>1){
+    ctx.strokeStyle='#ffffffaa';ctx.lineWidth=2;ctx.beginPath();
+    G.flight.trail.forEach((tp,i)=>{const s=w2s(tp.x,tp.y);i?ctx.lineTo(s.x,s.y):ctx.moveTo(s.x,s.y);});ctx.stroke();
+  }
+  const bp=w2s(G.ball.x,G.ball.y),hh=G.ball.h||0;
+  ctx.fillStyle='#00000066';ctx.beginPath();ctx.ellipse(bp.x,bp.y,6,2.6,0,0,7);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bp.x,bp.y-hh*bp.k*0.55,5,0,7);ctx.fill();
+  ctx.fillStyle='#c00';ctx.beginPath();ctx.arc(bp.x-1.5,bp.y-hh*bp.k*0.55-1.5,1.4,0,7);ctx.fill();
+  // flecha de apuntado + marca de carry estimado
+  if(G.screen==='play'&&!G.meter&&!G.flight&&!G.roll&&!G.putt&&!G.holed){
+    const club=CLUBS[G.clubIndex],R=club.max*driveScale();
+    const ex=G.ball.x+Math.cos(G.aim)*Math.min(R,distToPin(G.ball.x,G.ball.y));
+    const ey=G.ball.y+Math.sin(G.aim)*Math.min(R,distToPin(G.ball.x,G.ball.y));
+    const s0=w2s(G.ball.x,G.ball.y),s1=w2s(ex,ey);
+    ctx.strokeStyle=G.curve?'#40c4ff':'#fff';ctx.setLineDash([9,6]);ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=1;
+    ctx.fillStyle='#ffeb3b';ctx.beginPath();ctx.arc(s1.x,s1.y,4,0,7);ctx.fill();
+    if(G.curve){ctx.fillStyle='#40c4ff';ctx.font='bold 13px monospace';
+      ctx.fillText(G.curve<0?'HOOK ◀':'▶ SLICE',s0.x+10,s0.y-12);}
+  }
+  if(G.screen==='select')drawSelect();
+  drawMeters();
+}
+// medidores arcade POWER + HEIGHT (Nazca)
+function drawMeters(){
+  if(G.screen!=='play')return;
+  const bx=40,bw=W-80,by=H-64,bh=20;
+  ctx.fillStyle='#000c';ctx.fillRect(bx-8,by-30,bw+16,66);
+  ctx.fillStyle='#ffd23f';ctx.font='bold 12px monospace';
+  const club=CLUBS[G.clubIndex];
+  ctx.fillText(`POWER ${club.name}`,bx,by-14);
+  // barra potencia
+  ctx.fillStyle='#222';ctx.fillRect(bx,by,bw,bh);
+  const segs=40,cap=powerCap();
+  for(let i=0;i<segs;i++){const f=i/segs;
+    ctx.fillStyle=f>1?'#b388ff':f>0.85?'#ff5252':f>0.6?'#ffb300':'#00e676';
+    if(G.meter&&(G.meter.phase!=='power'||f<=G.meter.p))ctx.fillRect(bx+i*(bw/segs)+1,by+2,bw/segs-2,bh-4);
+    else if(!G.meter)ctx.fillRect(bx+i*(bw/segs)+1,by+2,bw/segs-2,2);
+  }
+  if(G.meter&&G.meter.phase==='power'){ctx.fillStyle='#fff';ctx.fillRect(bx+G.meter.p*bw-1,by-4,3,bh+8);}
+  if(G.meter&&G.meter.phase!=='power'){ctx.fillStyle='#fff';ctx.fillRect(bx+Math.min(1,G.meter.power)*bw-1,by-4,3,bh+8);}
+  // guideline de putt (sugerencia del caddie, como el original)
+  if(onGreen(G.ball.x,G.ball.y)&&(!G.meter||G.meter.phase==='power')){
+    const n=puttNeed(),gx=bx+n*bw;
+    ctx.fillStyle='#40c4ff';ctx.fillRect(gx-1,by-8,3,bh+16);
+    ctx.fillStyle='#40c4ff';ctx.fillText('▼ guía',gx-16,by-10);
+  }
+  // barra HEIGHT con zona roja (miss) y blanca (perfect)
+  const hx=bx,hw=bw,hy=by+26,hh=12;
+  ctx.fillStyle='#ffd23f';ctx.fillText('HEIGHT',hx,hy+10);
+  ctx.fillStyle='#222';ctx.fillRect(hx+70,hy,hw-70,hh);
+  if(G.meter&&G.meter.phase==='height'){
+    const lie=G.meter.lie,rz=redZone(lie),sw=heightSweet(),X0=hx+70,Wd=hw-70;
+    ctx.fillStyle='#c62828';ctx.fillRect(X0,hy,X0+Wd*rz-X0+Wd*0,hh); // izq
+    ctx.fillRect(X0+Wd*(1-rz),hy,Wd*rz,hh);                          // der
+    ctx.fillStyle='#fff';ctx.fillRect(X0+Wd*(0.5-sw),hy,Wd*sw*2,hh); // dulce
+    const cxp=X0+G.meter.p*Wd;
+    ctx.fillStyle='#00e5ff';ctx.fillRect(cxp-2,hy-3,4,hh+6);
+    ctx.fillStyle='#fff';ctx.font='10px monospace';
+    ctx.fillText(lie.toUpperCase()+' · rojo=MISS',X0+Wd*0.32,hy+10);
+  }
+  ctx.font='bold 12px monospace';
+}
+function drawSelect(){
+  ctx.fillStyle='#000d';ctx.fillRect(60,60,W-120,H-190);
+  ctx.strokeStyle='#ffd23f';ctx.lineWidth=3;ctx.strokeRect(60,60,W-120,H-190);
+  ctx.fillStyle='#ffd23f';ctx.font='bold 26px monospace';ctx.textAlign='center';
+  ctx.fillText('★ NEO TURF MASTERS ★',W/2,105);
+  ctx.fillStyle='#fff';ctx.font='13px monospace';
+  ctx.fillText('Big Tournament Golf · núcleo fiel — elige golfista (1-6)',W/2,128);
+  GOLFERS.forEach((g,i)=>{
+    const y=155+i*44,sel=i===G.gi;
+    ctx.fillStyle=sel?'#ffd23f':'#fff';ctx.font=(sel?'bold ':'')+'14px monospace';ctx.textAlign='left';
+    ctx.fillText(`${i+1}. ${g.name} (${g.ctry})`,90,y);
+    ctx.font='12px monospace';ctx.fillStyle=sel?'#ffe9a3':'#9ccc9c';
+    ctx.fillText(`DRV:${'●'.repeat(g.drv)}${'○'.repeat(5-g.drv)} ACC:${'●'.repeat(g.acc)}${'○'.repeat(5-g.acc)} SKL:${'●'.repeat(g.skl)}${'○'.repeat(5-g.skl)} REC:${'●'.repeat(g.rec)}${'○'.repeat(5-g.rec)} PUT:${'●'.repeat(g.put)}${'○'.repeat(5-g.put)}`,250,y);
+    if(g.id==='power'){ctx.fillStyle='#ff8a80';ctx.fillText('¡supera el 100%!',700,y);}
+  });
+  ctx.textAlign='left';
+  ctx.fillStyle='#9ccc9c';ctx.font='12px monospace';
+  ctx.fillText('ACC=velocidad metros · SKL=zona blanca · REC=menos rojo en rough/sand · PUT=guía fina · DRV=distancia',90,H-160);
+  ctx.fillStyle='#fff';ctx.font='bold 14px monospace';
+  ctx.fillText('Pulsa ESPACIO o click para salir con el seleccionado',90,H-138);
+}
+function setMsg(m){document.getElementById('hudMsg').textContent=m;G.msg=m;}
+function updateHUD(){
+  const h=hole(),g=golfer(),club=CLUBS[G.clubIndex];
+  const names=['1st','2nd','3rd']; 
+  document.getElementById('hudHole').textContent=`${names[G.holeIndex]||(G.holeIndex+1)+'th'} HOLE · PAR ${h.par}`;
+  document.getElementById('hudGolfer').textContent=g.name;
+  document.getElementById('hudWind').textContent=`${G.wind.mph.toFixed(0)} mph`;
+  document.getElementById('windArrow').style.transform=`rotate(${G.wind.ang}rad)`;
+  document.getElementById('hudStroke').textContent=G.stroke;
+  const d=distToPin(G.ball.x,G.ball.y);
+  document.getElementById('hudClub').textContent=`${club.name} · ${(club.max*driveScale()).toFixed(0)}y · ${d.toFixed(0)}y a pin · ${lieAt(G.ball.x,G.ball.y)}`;
+}
+let AC=null;
+function snd(good){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+  const o=AC.createOscillator(),gn=AC.createGain();o.connect(gn);gn.connect(AC.destination);
+  o.frequency.value=good?880:160;gn.gain.value=0.06;o.start();o.stop(AC.currentTime+0.12);}catch(e){}}
+
+// ---------- 9. GAME LOOP ----------
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  if(G.screen==='play'){
+    if(G.meter){
+      const sp=meterSpeed(G.meter.lie)*(G.meter.phase==='power'?0.9:1.25);
+      if(G.meter.phase==='power'){
+        // sube a tope y cae solo (como la gauge de Nazca)
+        G.meter.p+=sp*dt*G.meter.dir;
+        if(G.meter.p>=powerCap()){G.meter.p=powerCap();G.meter.dir=-1;}
+        if(G.meter.p<=0){G.meter.p=0;G.meter.dir=1;}
+      }else{
+        G.meter.p+=sp*dt*1.4*G.meter.dir;
+        if(G.meter.p>=1){G.meter.p=1;G.meter.dir=-1;}
+        if(G.meter.p<=0){G.meter.p=0;G.meter.dir=1;}
+      }
+    }
+    if(G.flight)stepFlight(dt);
+    else if(G.roll)stepRoll(dt);
+    else if(G.putt)stepPutt(dt);
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+document.addEventListener('keydown',e=>{
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
+},{capture:true});
+updateHUD();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
