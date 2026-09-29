@@ -3,25 +3,28 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>NEO TURF MASTERS — vista trasera fiel (prototipo)</title>
+<title>NEO TURF MASTERS — pixel-art propio estilo Neo Geo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
 <style>
-  *{box-sizing:border-box} body{margin:0;background:#06130b;color:#fff;font-family:"Courier New",monospace}
-  #top{display:flex;gap:10px;align-items:center;justify-content:center;padding:8px;background:#0d2b16;border-bottom:3px solid #ffd23f;flex-wrap:wrap}
-  .tag{background:#123c1f;border:2px solid #ffd23f;border-radius:6px;padding:2px 10px;font-weight:bold}
+  *{box-sizing:border-box} body{margin:0;background:#06130b;color:#fff;font-family:'Press Start 2P',monospace}
+  #top{display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;background:#0d2b16;border-bottom:3px solid #ffd23f;flex-wrap:wrap;font-size:10px}
+  .tag{background:#123c1f;border:2px solid #ffd23f;border-radius:6px;padding:6px 8px}
+  #hudMsg{color:#ffeb3b}
   #windArrow{display:inline-block}
   #wrap{display:flex;justify-content:center;padding:8px}
   canvas{background:#000;border:4px solid #0a1f10;border-radius:8px;max-width:97vw;height:auto}
-  #help{text-align:center;font-size:13px;opacity:.9;padding:6px}
+  #help{text-align:center;font-size:9px;opacity:.9;padding:6px;font-family:monospace}
   kbd{background:#222;border:1px solid #888;border-radius:4px;padding:0 5px}
 </style>
 </head>
 <body>
 <div id="top">
   <span class="tag" id="hudHole">1st HOLE · PAR 4</span>
-  <span class="tag">⛳ <span id="hudGolfer">YOUNG HERO</span></span>
+  <span class="tag">⛳ <span id="hudGolfer">GEORGE SPINNER</span></span>
   <span class="tag">WIND <span id="windArrow">➤</span> <span id="hudWind">5 mph</span></span>
   <span class="tag">STROKE <span id="hudStroke">0</span></span>
-  <span class="tag" id="hudClub">1 WOOD · 270y</span>
+  <span class="tag" id="hudClub">1 WOOD</span>
   <span class="tag" id="hudMsg">···</span>
 </div>
 <div id="wrap"><canvas id="game" width="960" height="540"></canvas></div>
@@ -34,20 +37,29 @@
 </div>
 <script>
 'use strict';
-/* NEO TURF MASTERS (SNK/Nazca 1996) — núcleo fiel con VISTA TRASERA.
-   El original se juega detrás del golfista: sprite animando el swing,
-   campo en perspectiva hacia el horizonte, gauge vertical POWER/HEIGHT,
-   interstitial "NICE SHOT!", putting con lectura de slope.
-   Mundo en yardas (x=adelante, y=lateral). Proyección pseudo-3D arcade. */
+/* NEO TURF MASTERS — núcleo fiel, ARTE PIXEL PROPIO estilo Neo Geo.
+   Referencia estudiada (spriters-resource, solo guía visual): el golfista
+   original se compone por PARTES (piernas, torso, cabeza, brazos+palo).
+   Replicamos esa arquitectura con sprites 100% dibujados por nosotros:
+   - PIX: mapas de píxeles como strings + paleta por golfista
+   - Cursos con dither, franjas de corte, fringe, anillos en green,
+     bunkers rastrillados, pines/robles/palmeras, cartel del hoyo.
+   Nombres reales de los golfistas como homenaje (arte original). */
 
-// ---------- 1. DATOS ----------
+// ---------- 1. DATOS (nombres reales del arcade) ----------
 const GOLFERS = [
-  {id:'hero',  name:'YOUNG HERO',  ctry:'USA', drv:3, acc:3, skl:3, rec:3, put:3, shirt:'#e53935', pants:'#2b3a67', skin:'#f2c89b', cap:'#ffffff'},
-  {id:'tech',  name:'TECHNICIAN',  ctry:'UK',  drv:2, acc:4, skl:5, rec:4, put:3, shirt:'#1e88e5', pants:'#263238', skin:'#e8b88a', cap:'#0d47a1'},
-  {id:'vet',   name:'VETERAN',     ctry:'AUS', drv:1, acc:2, skl:4, rec:5, put:2, shirt:'#6d4c41', pants:'#3e2723', skin:'#d9a06f', cap:'#4e342e'},
-  {id:'maker', name:'SHOT MAKER',  ctry:'GER', drv:4, acc:5, skl:2, rec:2, put:4, shirt:'#fdd835', pants:'#212121', skin:'#f2c89b', cap:'#212121'},
-  {id:'power', name:'POWER GOLFER',ctry:'BRA', drv:5, acc:1, skl:1, rec:1, put:1, shirt:'#00e676', pants:'#1b5e20', skin:'#a06a42', cap:'#00c853'},
-  {id:'putt',  name:'PUTT MASTER', ctry:'JPN', drv:3, acc:2, skl:4, rec:2, put:5, shirt:'#ab47bc', pants:'#4a148c', skin:'#f2c89b', cap:'#ffeb3b'},
+  {name:'GEORGE SPINNER', nick:'YOUNG HERO', ctry:'USA', drv:3, acc:3, skl:3, rec:3, put:3,
+   shirt:'#7a8b3d', dark:'#5a6b2d', pants:'#3d3d3d', skin:'#f0c090', hair:'#5a3a1a', feat:'sidepart'},
+  {name:'THOMAS STEWART', nick:'TECHNICIAN', ctry:'UK', drv:2, acc:4, skl:5, rec:4, put:3,
+   shirt:'#3d6b8b', dark:'#2d4b63', pants:'#222', skin:'#f0c8a0', hair:'#d8b83d', feat:'glasses'},
+  {name:'FRANK ADAMS', nick:'VETERAN', ctry:'AUS', drv:1, acc:2, skl:4, rec:5, put:2,
+   shirt:'#6b5a3d', dark:'#4a3d2d', pants:'#2d2d2d', skin:'#d8a070', hair:'#4a2d1a', feat:'cap_stache'},
+  {name:'ROBERT LANDORT', nick:'SHOT MAKER', ctry:'GER', drv:4, acc:5, skl:2, rec:2, put:4,
+   shirt:'#c8b83d', dark:'#8b7d2d', pants:'#1a1a1a', skin:'#f0c090', hair:'#b8b8b8', feat:'stern'},
+  {name:'FERNANDO ALMEIDA', nick:'POWER GOLFER', ctry:'BRA', drv:5, acc:1, skl:1, rec:1, put:1,
+   shirt:'#2d9b4d', dark:'#1d6b32', pants:'#1d4b22', skin:'#8b5a32', hair:'#1a1a1a', feat:'band'},
+  {name:'TOYOSHIGE TAKENO', nick:'PUTT MASTER', ctry:'JPN', drv:3, acc:2, skl:4, rec:2, put:5,
+   shirt:'#8b3d9b', dark:'#5d2d6b', pants:'#2d1d4b', skin:'#f0c090', hair:'#111', feat:'visor'},
 ];
 const CLUBS = [
   {id:'1W', name:'1 WOOD', max:270, loft:12},
@@ -63,32 +75,143 @@ const HOLES = [
   {par:4, tee:{x:0,y:0}, pin:{x:390,y:30}, fairwayW:46,
    green:{rx:20,ry:15,tilt:{x:0.55,y:-0.35}},
    bunkers:[{x:300,y:-18,rx:16,ry:9},{x:352,y:52,rx:14,ry:8}],
-   water:[{x:200,y:70,rx:70,ry:26}], trees:[{x:150,y:-55},{x:250,y:60},{x:330,y:-45},{x:120,y:50}]},
+   water:[{x:200,y:70,rx:70,ry:26}],
+   trees:[{x:150,y:-55,t:'pine'},{x:250,y:60,t:'oak'},{x:330,y:-45,t:'pine'},{x:120,y:50,t:'palm'}]},
   {par:3, tee:{x:0,y:0}, pin:{x:175,y:-20}, fairwayW:40,
    green:{rx:16,ry:13,tilt:{x:-0.5,y:0.45}},
    bunkers:[{x:150,y:2,rx:18,ry:10},{x:190,y:-42,rx:12,ry:7}],
-   water:[], trees:[{x:90,y:45},{x:210,y:35}]},
+   water:[], trees:[{x:90,y:45,t:'oak'},{x:210,y:35,t:'pine'}]},
   {par:5, tee:{x:0,y:0}, pin:{x:520,y:-40}, fairwayW:50,
    green:{rx:21,ry:15,tilt:{x:0.3,y:0.6}},
    bunkers:[{x:400,y:-70,rx:16,ry:9},{x:480,y:-8,rx:15,ry:8},{x:540,y:-60,rx:13,ry:7}],
-   water:[{x:320,y:40,rx:60,ry:24}], trees:[{x:180,y:-60},{x:300,y:-55},{x:450,y:45},{x:560,y:10}]},
+   water:[{x:320,y:40,rx:60,ry:24}],
+   trees:[{x:180,y:-60,t:'palm'},{x:300,y:-55,t:'pine'},{x:450,y:45,t:'oak'},{x:560,y:10,t:'pine'}]},
 ];
 
-// ---------- 2. ESTADO ----------
+// ---------- 2. PIXEL ART PROPIO (mapas de strings, paleta parametrizada) ----------
+// Claves: K=contorno . =transparente; T=camisa t=sombra camisa P=pantalón
+// S=piel s=sombra piel H=cabello C=visera/gorra E=ojo G=gafa M=bigote Y=cinta
+function headMap(g){
+  const base=[
+  '...KKKK...',
+  '..KHHHHK..',
+  '.KHHHHHHK.',
+  '.KHSSSSHK.',
+  '.KHSES EHK.',
+  '.KHSSSSHK.',
+  '..KSSSSK..',
+  '..KSssSK..',
+  '...KSSK...',
+  '....KK....'];
+  // (sin espacios: fila 4 real abajo)
+  const rows=base.slice();
+  rows[4]='.KHSESEHK.';
+  const f=g.feat;
+  if(f==='glasses'){rows[1]='..KHHHHK..';rows[4]='.KGEEEEGK.';}
+  if(f==='cap_stache'){
+    rows[1]='..KCCCCK..';rows[2]='.KCCCCCCK.';
+    rows[3]='.KCCCCCKKK';rows[6]='..KMMMMK..';
+  }
+  if(f==='stern'){rows[3]='.KHSESEHK.';}
+  if(f==='band'){rows[0]='..KKKKKK..';rows[1]='.KHHHHHHK.';rows[2]='.KYYYYYYK.';}
+  if(f==='visor'){rows[1]='..KHHHHK..';rows[2]='.KVVVVVKKK';}
+  return rows;
+}
+const TORSO_BENT=[
+'.....KKKKK..',
+'....KTTTTTK.',
+'...KTTtTTTK.',
+'...KTTtTTTK.',
+'..KTTTTTtTK.',
+'..KTtTTTtTK.',
+'...KTTtTTK..',
+'....KTTTK...',
+'.....KTK....',
+'......K.....'];
+const TORSO_UP=[
+'...KKKKK...',
+'..KTTTTTK..',
+'..KTTtTTK..',
+'..KTTtTTK..',
+'.KTTTtTTTK.',
+'.KTtTTtTTK.',
+'..KTTtTTK..',
+'..KTTtTTK..',
+'...KTTTK...',
+'....KKK....'];
+const LEGS_ADDR=[
+'..KK....KK..',
+'..KPK...KPK.',
+'..KPK...KPK.',
+'..KPpK..KPK.',
+'..KPpK..KPK.',
+'..KPK...KPK.',
+'..KPK...KPK.',
+'.KPPK...KPPK',
+'.KKKK...KKKK',
+'.............'];
+const LEGS_FOLLOW=[
+'...KK...KK..',
+'...KPK..KPK.',
+'...KPK..KPK.',
+'...KPpK.KPK.',
+'...KPpKKPK..',
+'...KPK.KPK..',
+'...KPK.KPK..',
+'..KPPK..KPPK',
+'..KKKK...KKK',
+'.............'];
+// banderas 12x9 simplificadas
+const FLAGS={
+ USA:['RRRRRWWWWWWR','RRRRRWWWWWWR','BBBBBWWWWWWR','BBBBBRRRRRRR','BBBBBWWWWWWR','RRRRRRRRRRRR','WWWWWWWWWWWW','RRRRRRRRRRRR','WWWWWWWWWWWW'],
+ UK:['BBBBWWBBBBB','BBBWRRWBBBB','BBWRRRRWBBB','WWRRRRRRRWW','BBWRRRRWBBB','BBBWRRWBBBB','BBBBWWBBBBB','BBBBWWBBBBB','BBBBWWBBBBB'],
+ AUS:['BBBKBBBBBBB','BBBBBKBBBBB','BBWBBBBBWBB','BBBBBBBBBBB','BBWBBBBBWBB','BBBBBKBBBBB','BBBKBBBBBBB','BBBBBBBBBBB','BBBBBBBBBBB'],
+ GER:['KKKKKKKKKKKK','KKKKKKKKKKKK','KKKKKKKKKKKK','RRRRRRRRRRRR','RRRRRRRRRRRR','RRRRRRRRRRRR','YYYYYYYYYYYY','YYYYYYYYYYYY','YYYYYYYYYYYY'],
+ BRA:['GGGGGGGGGGGG','GGGGGGYYGGGG','GGGGYYYYYYGG','GGGYYBBYYGGG','GGGGYYYYYYGG','GGGGGGYYGGGG','GGGGGGGGGGGG','GGGGGGGGGGGG','GGGGGGGGGGGG'],
+ JPN:['WWWWWWWWWWWW','WWWWWWWWWWWW','WWWRRRRRWWW','WWRRRRRRRWW','WWRRRRRRRWW','WWRRRRRRRWW','WWWRRRRRWWW','WWWWWWWWWWWW','WWWWWWWWWWWW']};
+const FCOL={R:'#d83a3a',W:'#f4f4f4',B:'#2a4ad8',K:'#111',Y:'#ffd23f',G:'#2d9b4d'};
+function drawMap(rows,dx,dy,px,pal){
+  for(let r=0;r<rows.length;r++){const row=rows[r];
+    for(let c=0;c<row.length;c++){const ch=row[c];
+      if(ch==='.'||ch===' ')continue;
+      ctx.fillStyle=pal[ch]||'#f0f';
+      ctx.fillRect(Math.round(dx+c*px),Math.round(dy+r*px),Math.ceil(px),Math.ceil(px));
+    }}
+}
+function palFor(g){
+  return {K:'#101010',T:g.shirt,t:g.dark,P:g.pants,p:'#00000055',S:g.skin,s:'#c89868',
+    H:g.hair,C:g.hair,E:'#101010',G:'#222',M:'#2d1a0d',V:'#f4f4f4',Y:'#ffd23f',W:'#f4f4f4'};
+}
+// sprites pre-compuestos por golfista (cabeza+paleta) a 1px, se escalan al dibujar
+const SPR={};
+function buildSprites(){
+  for(let i=0;i<GOLFERS.length;i++){
+    const g=GOLFERS[i],pal=palFor(g);
+    const mk=(rows)=>{const c=document.createElement('canvas');
+      let w=0;rows.forEach(r=>w=Math.max(w,r.length));
+      c.width=w;c.height=rows.length;const x=c.getContext('2d');
+      rows.forEach((row,r)=>{for(let col=0;col<row.length;col++){const ch=row[col];
+        if(ch==='.'||ch===' ')continue;x.fillStyle=pal[ch]||'#f0f';x.fillRect(col,r,1,1);}});
+      return c;};
+    SPR[i]={head:mk(headMap(g)),bent:mk(TORSO_BENT),up:mk(TORSO_UP),
+      legsA:mk(LEGS_ADDR),legsF:mk(LEGS_FOLLOW),pal:pal};
+  }
+}
+
+// ---------- 3. ESTADO ----------
 const cv = document.getElementById('game'), ctx = cv.getContext('2d');
 const W = cv.width, H = cv.height;
-const HOR = 150;      // horizonte en px
+const HOR = 150;
 const G = {
   screen:'select', gi:0, holeIndex:0, stroke:0, total:0, holed:false,
   ball:{x:0,y:0,h:0}, prev:{x:0,y:0}, lastSafe:{x:0,y:0},
   aim:0, clubIndex:0, curve:0,
   wind:{ang:0.5, mph:6},
   meter:null, flight:null, roll:null, putt:null,
-  swing:{stage:'idle', t:0, pending:null},  // idle|back|top|down|follow|puttswing
-  banner:null, fade:0,
-  camX:-14, K:55,
-  cloudT:0,
+  swing:{stage:'idle', t:0, pending:null},
+  banner:null, fade:0, camX:-14, K:55, cloudT:0, birdT:0,
 };
+buildSprites();
 const golfer = ()=>GOLFERS[G.gi];
 const hole = ()=>HOLES[G.holeIndex];
 const meterSpeed = lie => (1.55 - golfer().acc*0.17) * (lie==='fairway'||lie==='tee'?1 : lie==='green'?0.85 : lie==='rough'?1.45 : 1.8);
@@ -97,13 +220,13 @@ const redZone = lie => Math.max(0.01,(lie==='sand'?0.30 : lie==='rough'?0.17 : 0
 const driveScale = ()=> 0.86 + golfer().drv*0.05;
 const powerCap = ()=> golfer().drv>=5?1.14 : golfer().drv>=4?1.06 : 1.0;
 
-// ---------- 3. TERRENO ----------
+// ---------- 4. TERRENO ----------
 const d2=(ax,ay,bx,by)=>Math.hypot(bx-ax,by-ay);
 function inEllipse(x,y,e){return ((x-e.x)/e.rx)**2+((y-e.y)/e.ry)**2<1;}
 function holeLen(){const h=hole();return d2(h.tee.x,h.tee.y,h.pin.x,h.pin.y);}
 function fairwayCenterAt(wx){
-  const h=hole(), L=holeLen()||1;
-  const t=Math.max(0,Math.min(1,(wx-h.tee.x)/(h.pin.x-h.tee.x||1)));
+  const h=hole();
+  const t=Math.max(0,Math.min(1,(wx-h.tee.x)/((h.pin.x-h.tee.x)||1)));
   return {y:h.tee.y+(h.pin.y-h.tee.y)*t, t};
 }
 function onGreen(x,y){const h=hole();return ((x-h.pin.x)/h.green.rx)**2+((y-h.pin.y)/h.green.ry)**2<1;}
@@ -131,14 +254,14 @@ function autoClub(){
   return 0;
 }
 
-// ---------- 4. SWING (triple tap + animación del golfista) ----------
+// ---------- 5. SWING ----------
 function startSwing(){
   if(G.meter||G.flight||G.roll||G.putt||G.screen!=='play'||G.swing.stage!=='idle') return;
   const lie=lieAt(G.ball.x,G.ball.y);
   if(lie==='water') return;
   G.meter={phase:'power',p:0,dir:1,power:0,lie};
   G.swing={stage:'back',t:0,pending:null};
-  setMsg(lie==='green'?'PUTTING: fija la potencia en la guía':'POWER: ¡fija con ESPACIO!');
+  setMsg(lie==='green'?'PUTTING: fija en la guía':'POWER!');
 }
 function tapMeter(){
   if(G.swing.stage!=='idle'&&G.swing.stage!=='back'&&G.swing.stage!=='top') return;
@@ -146,67 +269,56 @@ function tapMeter(){
   if(m.phase==='power'){
     m.power=Math.min(m.p,powerCap());
     if(lieAt(G.ball.x,G.ball.y)==='green'){
-      G.meter=null;
-      G.swing={stage:'pdown',t:0,pending:{power:m.power}};
-      return;
+      G.meter=null;G.swing={stage:'pdown',t:0,pending:{power:m.power}};return;
     }
     m.phase='height'; m.p=0.5; m.dir=Math.random()<0.5?-1:1;
     G.swing={stage:'top',t:0,pending:null};
-    setMsg('HEIGHT: ¡clava el centro blanco!');
+    setMsg('HEIGHT!');
   } else {
     const pend={power:m.power,hPos:m.p,lie:m.lie,clubIndex:G.clubIndex,aim:G.aim,curve:G.curve};
-    G.meter=null;
-    G.swing={stage:'down',t:0,pending:pend};
+    G.meter=null;G.swing={stage:'down',t:0,pending:pend};
   }
 }
-// pose del swing: clubA en grados (0=abajo hacia la bola, -=atrás, +=adelante)
-function swingPose(){
+function swingClubA(){
+  // ángulo del palo: 0=abajo en la bola, -=atrás, +=adelante (grados)
   const s=G.swing;
-  if(s.stage==='back'){
-    const p=G.meter?Math.min(1,G.meter.p):0;
-    return {lean:0.15+0.12*p, clubA:-20-170*p, crouch:0.5+0.12*p};
-  }
-  if(s.stage==='top') return {lean:0.28, clubA:-195+Math.sin(performance.now()/90)*4, crouch:0.62};
-  if(s.stage==='down'){const k=Math.min(1,s.t/0.13);return {lean:0.28-0.2*k, clubA:-195+205*k, crouch:0.62-0.17*k};}
-  if(s.stage==='pdown'){const k=Math.min(1,s.t/0.15);return {lean:0.12, clubA:-20+38*k-46*Math.max(0,k-0.5)*2, crouch:0.5};}
-  if(s.stage==='follow'){const k=Math.min(1,s.t/0.5);return {lean:-0.12, clubA:10+120*Math.min(1,k*1.4), crouch:0.4-0.08*k};}
-  return {lean:0.12+Math.sin(performance.now()/600)*0.02, clubA:-16, crouch:0.5}; // idle respirando
+  if(s.stage==='back'){const p=G.meter?Math.min(1,G.meter.p):0;return -15-165*p;}
+  if(s.stage==='top')return -185+Math.sin(performance.now()/90)*4;
+  if(s.stage==='down'){const k=Math.min(1,s.t/0.13);return -185+195*k;}
+  if(s.stage==='pdown'){const k=Math.min(1,s.t/0.15);return -15+30*k-50*Math.max(0,k-0.5);}
+  if(s.stage==='follow'){const k=Math.min(1,s.t/0.5);return 10+125*Math.min(1,k*1.4);}
+  return -14+Math.sin(performance.now()/600)*1.5;
 }
-/* Matemática del tiro:
-   R = effMax · power · hFactor ;  v0 = sqrt(R·g/sin(2·loft))
-   x += (vx + Wx)·dt … y += (vy + Wy)·dt + curva·t (Magnus hook/slice)
-   h: parábola con g. Viento mph→yd/s (k≈1.1): 10 mph ≈ 12y al driver. */
 function impact(){
   const s=G.swing;
-  if(s.stage==='pdown'){ doPutt(s.pending.power); }
-  else if(s.pending){ doShot(s.pending); }
+  if(s.stage==='pdown')doPutt(s.pending.power);
+  else if(s.pending)doShot(s.pending);
   G.swing={stage:'follow',t:0,pending:null};
 }
 function doShot(ps){
   const g=golfer(), club=CLUBS[ps.clubIndex], lie=ps.lie;
   const sw=heightSweet(), rz=redZone(lie);
   if(ps.hPos<rz||ps.hPos>1-rz){
-    G.stroke++; setMsg('¡MISS! El palo abanica el aire (+1)'); updateHUD(); snd('miss');
-    return;
+    G.stroke++; setMsg('MISS! (+1)'); updateHUD(); snd('miss');return;
   }
   const off=Math.abs(ps.hPos-0.5), perfect=off<sw;
   const hFactor=1.12-(ps.hPos*0.45);
-  const errLat=(off-sw>0?(off-sw):0)*46*(6-g.acc)*0.35*(lie==='fairway'||lie==='tee'?1:1.8);
+  const errLat=(off-sw>0?(off-sw):0)*46*(6-g.acc)*0.35*((lie==='fairway'||lie==='tee')?1:1.8);
   const errDir=(ps.hPos>0.5?1:-1);
   const effMax=club.max*driveScale();
   const R=Math.max(4,effMax*ps.power*hFactor*(perfect?1.02:1-(off*0.25)));
   const th=club.loft*Math.PI/180, gv=30;
   const v0=Math.sqrt(Math.max(1,R*gv/Math.max(0.12,Math.sin(2*th))));
-  G.prev={...G.ball}; G.lastSafe={x:G.ball.x,y:G.ball.y};
-  G.camX=G.ball.x-14; // la cámara se queda en el tee (como el original)
+  G.prev={x:G.ball.x,y:G.ball.y}; G.lastSafe={x:G.ball.x,y:G.ball.y};
+  G.camX=G.ball.x-14;
   G.flight={x:G.ball.x,y:G.ball.y,h:0,
     vx:v0*Math.cos(th)*Math.cos(ps.aim),vy:v0*Math.cos(th)*Math.sin(ps.aim),
     vh:v0*Math.sin(th),t:0,curve:(ps.curve*9*(0.4+ps.power))+(perfect?0:errDir*errLat*0.12),
     wx:Math.cos(G.wind.ang)*G.wind.mph*1.1,wy:Math.sin(G.wind.ang)*G.wind.mph*1.1,
     trail:[],R,perfect};
   G.stroke++;
-  if(perfect){G.banner={txt:'★ NICE SHOT! ★',t:1.4};snd('nice');}
-  else {setMsg(club.name+' · '+R.toFixed(0)+'y');snd('hit');}
+  if(perfect){G.banner={txt:'NICE SHOT!',t:1.4};snd('nice');}
+  else {setMsg(club.name+' '+R.toFixed(0)+'y');snd('hit');}
   updateHUD();
 }
 function doPutt(power){
@@ -216,7 +328,7 @@ function doPutt(power){
   G.prev={x:G.ball.x,y:G.ball.y};
   G.putt={x:G.ball.x,y:G.ball.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,t:0};
   G.stroke++;
-  setMsg(power<=need*1.15&&power>=need*0.85?'Buen toque…':'¡Atento a la caída!');
+  setMsg(power<=need*1.15&&power>=need*0.85?'Buen toque':'A leer la caída');
   snd('putt'); updateHUD();
 }
 function puttNeed(){
@@ -226,26 +338,25 @@ function puttNeed(){
   return Math.max(0.05,Math.min(1,(d/CLUBS[7].max)-along*0.12));
 }
 
-// ---------- 5. FÍSICA ----------
+// ---------- 6. FÍSICA ----------
 function stepFlight(dt){
   const f=G.flight; f.t+=dt;
-  const n=3;
-  for(let i=0;i<n;i++){
-    const h=dt/n;
+  for(let i=0;i<3;i++){
+    const h=dt/3;
     f.vy+=f.curve*h*0.55;
     f.x+=(f.vx+f.wx)*h*0.14; f.y+=(f.vy+f.wy)*h*0.14;
     f.vh-=30*h; f.h+=f.vh*h;
     if(f.h<=0){f.h=0;land();return;}
   }
-  f.trail.push({x:f.x,y:f.y});
+  f.trail.push({x:f.x,y:f.y,h:f.h});
   if(f.trail.length>70)f.trail.shift();
   G.ball.x=f.x;G.ball.y=f.y;G.ball.h=f.h;
 }
 function land(){
   const f=G.flight; G.flight=null;
   const x=f.x, y=f.y, lie=lieAt(x,y);
-  if(lie==='water'){G.stroke++;G.ball={x:G.lastSafe.x,y:G.lastSafe.y,h:0};G.fade=1;setMsg('¡Al agua! Penalidad +1, drop');updateHUD();autoAimClub();return;}
-  if(x<-60||x>hole().pin.x+160||Math.abs(y)>240){G.stroke++;G.ball={x:G.lastSafe.x,y:G.lastSafe.y,h:0};G.fade=1;setMsg('¡Fuera de límites! +1');updateHUD();autoAimClub();return;}
+  if(lie==='water'){G.stroke++;G.ball={x:G.lastSafe.x,y:G.lastSafe.y,h:0};G.fade=1;setMsg('¡Al agua! +1');updateHUD();autoAimClub();return;}
+  if(x<-60||x>hole().pin.x+160||Math.abs(y)>240){G.stroke++;G.ball={x:G.lastSafe.x,y:G.lastSafe.y,h:0};G.fade=1;setMsg('¡Fuera! +1');updateHUD();autoAimClub();return;}
   const keep=lie==='fairway'?0.35:lie==='green'?0.5:lie==='tee'?0.3:lie==='rough'?0.08:0.0;
   const sp=Math.hypot(f.vx,f.vy)*0.14*keep, a=Math.atan2(f.vy,f.vx);
   G.roll={x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp};
@@ -257,29 +368,30 @@ function stepRoll(dt){
   const s=slopeAt(r.x,r.y);
   r.vx+=s.x*18*dt; r.vy+=s.y*18*dt;
   const sp=Math.hypot(r.vx,r.vy), dec=fr*dt;
-  if(sp<=Math.max(0.6,dec)){G.roll=null;G.ball.x=r.x;G.ball.y=r.y;settle(true);return;}
+  if(sp<=Math.max(0.6,dec)){G.roll=null;G.ball.x=r.x;G.ball.y=r.y;settle();return;}
   r.vx-=r.vx/sp*dec; r.vy-=r.vy/sp*dec;
   r.x+=r.vx*dt; r.y+=r.vy*dt;
-  if(lieAt(r.x,r.y)==='water'){G.stroke++;G.roll=null;G.ball={x:G.lastSafe.x,y:G.lastSafe.y,h:0};G.fade=1;setMsg('¡Rueda al agua! +1');updateHUD();}
+  if(lieAt(r.x,r.y)==='water'){G.stroke++;G.roll=null;G.ball={x:G.lastSafe.x,y:G.lastSafe.y,h:0};G.fade=1;setMsg('¡Al agua! +1');updateHUD();}
   G.ball.x=r.x;G.ball.y=r.y;
 }
 function stepPutt(dt){
   const p=G.putt, s=slopeAt(p.x,p.y);
   p.vx+=s.x*10*dt; p.vy+=s.y*10*dt;
   const fr=8.5*dt, sp=Math.hypot(p.vx,p.vy);
-  if(sp<=Math.max(0.4,fr)){G.putt=null;G.ball.x=p.x;G.ball.y=p.y;settle(false);return;}
+  if(sp<=Math.max(0.4,fr)){G.putt=null;G.ball.x=p.x;G.ball.y=p.y;settle();return;}
   p.vx-=p.vx/sp*fr; p.vy-=p.vy/sp*fr;
   p.x+=p.vx*dt; p.y+=p.vy*dt;
   G.ball.x=p.x;G.ball.y=p.y;
 }
-function settle(cutCam){
+function settle(){
   const d=distToPin(G.ball.x,G.ball.y);
   if(d<1.4){
     G.total+=G.stroke; G.holed=true;
-    G.banner={txt:G.stroke-hole().par<=-2?'★ EAGLE! ★':G.stroke-hole().par===-1?'★ BIRDIE! ★':G.stroke-hole().par===0?'PAR':'BOGEY +'+(G.stroke-hole().par),t:2.2};
-    setMsg('¡Embocada en '+G.stroke+'! ESPACIO para seguir'); updateHUD(); snd('hole'); return;
+    const rel=G.stroke-hole().par;
+    G.banner={txt:rel<=-2?'EAGLE!':rel===-1?'BIRDIE!':rel===0?'PAR!':'BOGEY +'+rel,t:2.2};
+    setMsg('¡En '+G.stroke+'! ESPACIO'); updateHUD(); snd('hole'); return;
   }
-  if(cutCam){G.camX=G.ball.x-14;G.fade=1;} // corte de cámara al landing
+  G.camX=G.ball.x-14;G.fade=1;
   autoAimClub();
 }
 function autoAimClub(){
@@ -289,28 +401,57 @@ function autoAimClub(){
 }
 function nextHole(){
   G.holeIndex=(G.holeIndex+1)%HOLES.length; G.stroke=0; G.holed=false;
-  const h=hole(); G.ball={x:h.tee.x,y:h.tee.y,h:0}; G.prev={...G.ball}; G.lastSafe={...G.ball};
+  const h=hole(); G.ball={x:h.tee.x,y:h.tee.y,h:0}; G.prev={x:h.tee.x,y:h.tee.y}; G.lastSafe={x:h.tee.x,y:h.tee.y};
   G.wind={ang:Math.random()*Math.PI*2,mph:2+Math.random()*11};
   G.camX=G.ball.x-14; G.fade=1;
   G.screen='intro';
 }
 
-// ---------- 6. PROYECCIÓN PSEUDO-3D ----------
+// ---------- 7. PROYECCIÓN ----------
+function camY(){return G.ball.y*0.15;}
 function proj(wx,wy,h){
   h=h||0;
   const d=wx-G.camX;
   if(d<-4) return null;
   const K=G.K, f=K/(d+K), q=d/(d+K);
-  const sx=W/2+(wy-G.camY())*f*16;
-  const gy=(H+30)-(H+30-HOR)*q;
-  return {x:sx, y:gy-h*f*3.4, f:f, q:q};
+  return {x:W/2+(wy-camY())*f*16, y:(H+30)-(H+30-HOR)*q-h*f*3.4, f:f, q:q};
 }
 
-// ---------- 7. RENDER ----------
+// ---------- 8. TEXTURAS (tiles generados, dither estilo Neo Geo) ----------
+const TEX={};
+function buildTextures(){
+  // rough con checker dither
+  let c=document.createElement('canvas');c.width=64;c.height=64;
+  let x=c.getContext('2d');
+  x.fillStyle='#2f8f3e';x.fillRect(0,0,64,64);
+  x.fillStyle='#2a8238';
+  for(let r=0;r<32;r++)for(let q=0;q<32;q++)if((r+q)%2===0)x.fillRect(q*2,r*2,2,2);
+  for(let i=0;i<260;i++){x.fillStyle=Math.random()<0.5?'#256b32':'#3aa34c';
+    x.fillRect(Math.random()*64|0,Math.random()*64|0,2,1);}
+  TEX.rough=c;
+  // fairway con franjas de corte
+  c=document.createElement('canvas');c.width=64;c.height=64;x=c.getContext('2d');
+  for(let b=0;b<4;b++){x.fillStyle=b%2?'#4ab554':'#57c465';x.fillRect(0,b*16,64,16);}
+  for(let i=0;i<200;i++){x.fillStyle=Math.random()<0.5?'#3f9e4d':'#63d172';
+    x.fillRect(Math.random()*64|0,Math.random()*64|0,2,1);}
+  TEX.fair=c;
+  // green fino
+  c=document.createElement('canvas');c.width=64;c.height=64;x=c.getContext('2d');
+  x.fillStyle='#5fd46e';x.fillRect(0,0,64,64);
+  for(let i=0;i<320;i++){x.fillStyle=Math.random()<0.5?'#52bd60':'#6ce07c';
+    x.fillRect(Math.random()*64|0,Math.random()*64|0,1,1);}
+  TEX.green=c;
+}
+buildTextures();
+
+// ---------- 9. RENDER ----------
 function draw(){
   if(G.screen==='select'){drawSelect();return;}
   if(G.screen==='intro'){drawIntro();return;}
   drawSky();
+  // base rough con textura
+  ctx.fillStyle=ctx.createPattern(TEX.rough,'repeat');
+  ctx.fillRect(0,HOR,W,H-HOR);
   drawCourse();
   drawGolferAndBall();
   drawAimMarker();
@@ -320,187 +461,232 @@ function draw(){
   if(G.fade>0){ctx.fillStyle='rgba(0,0,0,'+Math.min(1,G.fade*1.4)+')';ctx.fillRect(0,0,W,H);G.fade-=0.06;}
 }
 function drawSky(){
-  const g=ctx.createLinearGradient(0,0,0,HOR+40);
-  g.addColorStop(0,'#2f7fe0');g.addColorStop(1,'#bfe6ff');
-  ctx.fillStyle=g;ctx.fillRect(0,0,W,HOR+40);
-  // nubes pixel moviéndose
+  const g=ctx.createLinearGradient(0,0,0,HOR+30);
+  g.addColorStop(0,'#2a6fd8');g.addColorStop(0.7,'#7cc0f0');g.addColorStop(1,'#cfeaff');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,HOR+30);
   ctx.fillStyle='#ffffffee';
-  const t=G.cloudT;
-  const clouds=[[120,60,3],[420,40,2],[700,80,4],[860,45,2],[250,95,2],[560,100,3]];
-  for(const c of clouds){
-    const cx=((c[0]+t*8)%(W+160))-80, cy=c[1], s=c[2]*3;
+  const t=G.cloudT, clouds=[[120,52,3],[420,34,2],[700,72,4],[860,40,2],[250,88,2],[560,95,3]];
+  for(const cl of clouds){
+    const cx=((cl[0]+t*8)%(W+160))-80, cy=cl[1], s=cl[2]*3;
     ctx.fillRect(cx,cy,s*8,s*2);ctx.fillRect(cx+s*2,cy-s,s*5,s);ctx.fillRect(cx+s*6,cy,s*4,s*2);
+  }
+  // pájaros
+  ctx.fillStyle='#222';
+  for(let i=0;i<3;i++){
+    const bx=((G.birdT*30+i*300)%(W+100))-50, by=60+i*22;
+    const f=Math.sin(G.birdT*10+i)>0?1:-1;
+    ctx.fillRect(bx-4,by,3,2);ctx.fillRect(bx+1,by+f*2,3,2);
   }
   // montañas
   ctx.fillStyle='#3b6ea5';
   ctx.beginPath();ctx.moveTo(0,HOR);ctx.lineTo(140,HOR-46);ctx.lineTo(300,HOR);ctx.fill();
   ctx.beginPath();ctx.moveTo(560,HOR);ctx.lineTo(700,HOR-60);ctx.lineTo(860,HOR);ctx.fill();
-  ctx.fillStyle='#5b8fc4';
-  ctx.beginPath();ctx.moveTo(140,HOR-46);ctx.lineTo(170,HOR-20);ctx.lineTo(110,HOR-20);ctx.fill();
+  ctx.fillStyle='#e8f4ff';
+  ctx.beginPath();ctx.moveTo(140,HOR-46);ctx.lineTo(162,HOR-26);ctx.lineTo(118,HOR-26);ctx.fill();
+  ctx.beginPath();ctx.moveTo(700,HOR-60);ctx.lineTo(724,HOR-38);ctx.lineTo(676,HOR-38);ctx.fill();
 }
-function groundBase(){
-  const g=ctx.createLinearGradient(0,HOR,0,H);
-  g.addColorStop(0,'#3fa34d');g.addColorStop(1,'#256b32');
-  ctx.fillStyle=g;ctx.fillRect(0,HOR,W,H-HOR);
-  // franjas de corte
-  ctx.fillStyle='#ffffff10';
-  for(let i=0;i<6;i++){ctx.fillRect(0,HOR+8+i*66,W,26);}
+function fairwaySeg(wx0,wx1,shade){
+  const h=hole(),c0=fairwayCenterAt(wx0),c1=fairwayCenterAt(wx1);
+  const hw=h.fairwayW/2;
+  const a=proj(wx0,c0.y-hw,0),b=proj(wx1,c1.y-hw,0),
+        d=proj(wx1,c1.y+hw,0),e=proj(wx0,c0.y+hw,0);
+  if(!a||!b||!d||!e)return;
+  ctx.fillStyle=shade;
+  ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(d.x,d.y);ctx.lineTo(e.x,e.y);
+  ctx.closePath();ctx.fill();
 }
 function drawCourse(){
-  groundBase();
   const h=hole();
-  // fairway: polígono en perspectiva siguiendo la línea tee→pin
-  ctx.fillStyle='#5cc46a';
-  ctx.beginPath();
-  let first=true;
-  const steps=24, x0=Math.max(G.camX+2,h.tee.x-20), x1=h.pin.x+40;
-  const L=[],Rr=[];
-  for(let i=0;i<=steps;i++){
-    const wx=x0+(x1-x0)*i/steps, c=fairwayCenterAt(wx);
-    L.push(proj(wx,c.y-h.fairwayW/2,0));Rr.push(proj(wx,c.y+h.fairwayW/2,0));
+  // fairway por segmentos alternos (franjas de corte que fugan)
+  const x0=Math.max(G.camX+2,h.tee.x-20),x1=h.pin.x+40,n=26;
+  for(let i=0;i<n;i++){
+    const a=x0+(x1-x0)*i/n,b=x0+(x1-x0)*(i+1)/n;
+    fairwaySeg(a,b,i%2?'#4ab554':'#57c465');
   }
-  for(const p of L){if(!p)continue;if(first){ctx.moveTo(p.x,p.y);first=false;}else ctx.lineTo(p.x,p.y);}
-  for(let i=Rr.length-1;i>=0;i--){const p=Rr[i];if(!p)continue;ctx.lineTo(p.x,p.y);}
-  ctx.closePath();ctx.fill();
-  // agua
+  // dither sobre fairway
+  ctx.fillStyle='#00000010';
+  for(let yy=HOR;yy<H;yy+=4)ctx.fillRect(0,yy,W,2);
+  // agua con brillo animado
   for(const wt of h.water){
     const p=proj(wt.x,wt.y,0);if(!p)continue;
-    ctx.fillStyle='#2f9fd8';
-    ctx.beginPath();ctx.ellipse(p.x,p.y,wt.rx*p.f*16,Math.max(2,wt.ry*p.f*16*0.45+p.q*10),0,0,7);ctx.fill();
-    ctx.fillStyle='#ffffff66';
-    ctx.beginPath();ctx.ellipse(p.x-wt.rx*p.f*4,p.y-3,wt.rx*p.f*8,3,0,0,7);ctx.fill();
+    const rx=wt.rx*p.f*16,ry=Math.max(3,wt.ry*p.f*16*0.5+p.q*10);
+    const g=ctx.createLinearGradient(p.x,p.y-ry,p.x,p.y+ry);
+    g.addColorStop(0,'#4fc3f7');g.addColorStop(1,'#1a6fb8');
+    ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(p.x,p.y,rx,ry,0,0,7);ctx.fill();
+    ctx.strokeStyle='#0d4b80';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(p.x,p.y,rx,ry,0,0,7);ctx.stroke();ctx.lineWidth=1;
+    ctx.fillStyle='#ffffffaa';
+    const t=performance.now()/300;
+    for(let k=0;k<4;k++){
+      const sx=p.x-rx+((t*20+k*rx/2)%(rx*2));
+      ctx.fillRect(sx,p.y-ry/2+(k%2)*ry/2,8,2);
+    }
   }
-  // green
+  // green: fringe + anillos de corte
   {const p=proj(h.pin.x,h.pin.y,0);
-   if(p){const rx=h.green.rx*p.f*16, ry=Math.max(3,h.green.ry*p.f*16*0.5+p.q*12);
-    const gg=ctx.createRadialGradient(p.x,p.y,2,p.x,p.y,Math.max(4,rx));
-    gg.addColorStop(0,'#75e384');gg.addColorStop(1,'#3aa34c');
-    ctx.fillStyle=gg;ctx.beginPath();ctx.ellipse(p.x,p.y,rx,ry,0,0,7);ctx.fill();
-    // flechas de slope sobre el green
-    const t=performance.now()/450, s0=slopeAt(h.pin.x,h.pin.y), mg=Math.hypot(s0.x,s0.y);
+   if(p){
+    const rx=h.green.rx*p.f*16,ry=Math.max(4,h.green.ry*p.f*16*0.5+p.q*12);
+    ctx.fillStyle='#8be08b';ctx.beginPath();ctx.ellipse(p.x,p.y,rx*1.25,ry*1.3,0,0,7);ctx.fill(); // fringe
+    for(let r=4;r>=1;r--){
+      ctx.fillStyle=r%2?'#5fd46e':'#54c75f';
+      ctx.beginPath();ctx.ellipse(p.x,p.y,rx*r/4,ry*r/4,0,0,7);ctx.fill();
+    }
+    // hoyo
+    ctx.fillStyle='#0d0d0d';ctx.beginPath();ctx.ellipse(p.x,p.y,Math.max(2,5*p.f),Math.max(1.5,2.5*p.f),0,0,7);ctx.fill();
+    // flechas de slope
+    const t=performance.now()/450,s0=slopeAt(h.pin.x,h.pin.y),mg=Math.hypot(s0.x,s0.y);
     if(mg>0.06){
       const an=Math.atan2(s0.y,s0.x);
       ctx.fillStyle=mg>0.6?'#ff5252':'#ffffff';
       ctx.font='bold 13px monospace';ctx.textAlign='center';
       for(let k=0;k<3;k++){
         const off=((t*10+k*14)%42)-21;
-        const ax=p.x+Math.cos(an)*off, ay=p.y-4+Math.sin(an)*off*0.5;
-        ctx.save();ctx.translate(ax,ay);ctx.rotate(an);ctx.fillText('➤',0,4);ctx.restore();
+        ctx.save();ctx.translate(p.x+Math.cos(an)*off,p.y-4+Math.sin(an)*off*0.5);ctx.rotate(an);
+        ctx.fillText('>',0,4);ctx.restore();
       }
       ctx.textAlign='left';
     }}}
-  // bunkers
+  // bunkers rastrillados
   for(const b of h.bunkers){
     const p=proj(b.x,b.y,0);if(!p)continue;
-    ctx.fillStyle='#ecd88f';
-    ctx.beginPath();ctx.ellipse(p.x,p.y,b.rx*p.f*16,Math.max(2,b.ry*p.f*16*0.5+p.q*8),0,0,7);ctx.fill();
+    const rx=b.rx*p.f*16,ry=Math.max(2,b.ry*p.f*16*0.5+p.q*8);
+    ctx.fillStyle='#c8a84d';ctx.beginPath();ctx.ellipse(p.x,p.y,rx+3,ry+2,0,0,7);ctx.fill(); // borde
+    ctx.fillStyle='#ecd88f';ctx.beginPath();ctx.ellipse(p.x,p.y,rx,ry,0,0,7);ctx.fill();
+    ctx.save();ctx.beginPath();ctx.ellipse(p.x,p.y,rx,ry,0,0,7);ctx.clip();
+    ctx.strokeStyle='#d9bd6a';ctx.lineWidth=1;
+    for(let l=-ry;l<ry;l+=4){ctx.beginPath();ctx.moveTo(p.x-rx,p.y+l);ctx.lineTo(p.x+rx,p.y+l-4);ctx.stroke();}
+    ctx.restore();
   }
-  // árboles (billboards, lejos→cerca)
-  const trs=h.trees.map(t=>({t:t,d:t.x-G.camX})).filter(o=>o.d>-4).sort((a,b)=>b.d-a.d);
+  // árboles por tipo
+  const trs=h.trees.map(t=>({t,d:t.x-G.camX})).filter(o=>o.d>-4).sort((a,b)=>b.d-a.d);
   for(const o of trs){
     const p=proj(o.t.x,o.t.y,0);if(!p)continue;
-    const r=Math.max(3,15*p.f+4);
-    ctx.fillStyle='#5b3a1e';ctx.fillRect(p.x-r*0.12,p.y-r*0.9,r*0.24,r*0.9);
-    ctx.fillStyle='#14521f';ctx.beginPath();ctx.arc(p.x,p.y-r*1.2,r,0,7);ctx.fill();
-    ctx.fillStyle='#2f9e44';ctx.beginPath();ctx.arc(p.x-r*0.3,p.y-r*1.45,r*0.62,0,7);ctx.fill();
+    if(o.t.t==='pine')drawPine(p.x,p.y,p.f);
+    else if(o.t.t==='palm')drawPalm(p.x,p.y,p.f);
+    else drawOak(p.x,p.y,p.f);
   }
-  // bandera + distancia al pin
+  drawTeeSign();
+  // bandera + PIN
   {const p=proj(h.pin.x,h.pin.y,0);
-   if(p){ctx.strokeStyle='#c62828';ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x,p.y-40);ctx.stroke();ctx.lineWidth=1;
-    ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(p.x,p.y-40);ctx.lineTo(p.x+22,p.y-33);ctx.lineTo(p.x,p.y-26);ctx.fill();
-    const d=distToPin(G.ball.x,G.ball.y);
-    ctx.fillStyle='#000a';const label='PIN '+d.toFixed(0)+'y';
-    ctx.font='bold 13px monospace';const tw=ctx.measureText(label).width;
-    ctx.fillRect(p.x-tw/2-5,p.y-60,tw+10,18);
-    ctx.fillStyle='#ffeb3b';ctx.fillText(label,p.x-tw/2,p.y-46);}}
+   if(p){ctx.strokeStyle='#eee';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x,p.y-42);ctx.stroke();ctx.lineWidth=1;
+    ctx.fillStyle='#e53935';ctx.beginPath();ctx.moveTo(p.x,p.y-42);ctx.lineTo(p.x+24,p.y-35);ctx.lineTo(p.x,p.y-28);ctx.fill();
+    const d=distToPin(G.ball.x,G.ball.y),label='PIN '+d.toFixed(0)+'y';
+    ctx.font='10px "Press Start 2P",monospace';
+    const tw=ctx.measureText(label).width;
+    ctx.fillStyle='#000c';ctx.fillRect(p.x-tw/2-5,p.y-64,tw+10,20);
+    ctx.fillStyle='#ffeb3b';ctx.fillText(label,p.x-tw/2,p.y-50);}}
 }
-// --- golfista pixel-art lateral (mirando a la derecha) con swing ---
+function drawPine(x,y,f){
+  const s=Math.max(2,13*f+3);
+  ctx.fillStyle='#00000044';ctx.beginPath();ctx.ellipse(x+1,y,5*f+2,2,0,0,7);ctx.fill();
+  ctx.fillStyle='#4a2d1a';ctx.fillRect(x-s*0.1,y-s*0.7,s*0.2,s*0.7);
+  const greens=['#14521f','#1d6b2a','#2f9e44'];
+  for(let i=0;i<3;i++){
+    const w=s*(1.1-i*0.28),yy=y-s*(0.7+i*0.75);
+    ctx.fillStyle=greens[i];
+    ctx.beginPath();ctx.moveTo(x-w/2,yy);ctx.lineTo(x,yy-s*0.9);ctx.lineTo(x+w/2,yy);ctx.fill();
+  }
+  ctx.fillStyle='#5cc46a';ctx.fillRect(x-s*0.28,y-s*1.9,s*0.14,s*0.5);
+}
+function drawOak(x,y,f){
+  const r=Math.max(3,12*f+3);
+  ctx.fillStyle='#00000044';ctx.beginPath();ctx.ellipse(x+1,y,r*0.7,2.4,0,0,7);ctx.fill();
+  ctx.fillStyle='#5b3a1e';ctx.fillRect(x-r*0.12,y-r*0.8,r*0.24,r*0.8);
+  ctx.fillStyle='#1d5c27';ctx.beginPath();ctx.arc(x,y-r*1.1,r,0,7);ctx.fill();
+  ctx.fillStyle='#2f8f3e';ctx.beginPath();ctx.arc(x-r*0.3,y-r*1.35,r*0.62,0,7);ctx.fill();
+  ctx.fillStyle='#63d172';
+  ctx.fillRect(x-r*0.5,y-r*1.6,3,2);ctx.fillRect(x+r*0.1,y-r*1.2,2,2);ctx.fillRect(x-r*0.1,y-r*0.9,2,1);
+}
+function drawPalm(x,y,f){
+  const s=Math.max(2,12*f+3);
+  ctx.fillStyle='#00000044';ctx.beginPath();ctx.ellipse(x+1,y,5*f+2,2,0,0,7);ctx.fill();
+  ctx.strokeStyle='#7a5a32';ctx.lineWidth=Math.max(1.5,2.4*f);
+  ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+s*0.3,y-s*1.2,x+s*0.5,y-s*1.9);ctx.stroke();
+  ctx.strokeStyle='#2f9e44';ctx.lineWidth=Math.max(1,1.6*f);
+  const tx=x+s*0.5,ty=y-s*1.9;
+  for(const a of [-2.6,-2.1,-1.6,-1.1,-0.6]){
+    ctx.beginPath();ctx.moveTo(tx,ty);
+    ctx.quadraticCurveTo(tx+Math.cos(a)*s*0.9,ty+Math.sin(a)*s*0.5,tx+Math.cos(a)*s*1.2,ty+Math.sin(a)*s*0.9+2);
+    ctx.stroke();
+  }
+  ctx.fillStyle='#6b4a22';ctx.beginPath();ctx.arc(tx,ty+s*0.1,2*f+1,0,7);ctx.fill();
+}
+function drawTeeSign(){
+  const h=hole(),p=proj(h.tee.x-8,h.tee.y-14,0);if(!p)return;
+  const s=Math.max(0.5,p.f*1.2+0.4);
+  ctx.fillStyle='#5b3a1e';ctx.fillRect(p.x-2*s,p.y-16*s,4*s,16*s);
+  ctx.fillStyle='#8b5a2b';ctx.fillRect(p.x-11*s,p.y-28*s,22*s,13*s);
+  ctx.strokeStyle='#3d2410';ctx.lineWidth=1;ctx.strokeRect(p.x-11*s,p.y-28*s,22*s,13*s);
+  ctx.fillStyle='#ffeb3b';ctx.font=Math.max(6,8*s)+'px "Press Start 2P",monospace';ctx.textAlign='center';
+  ctx.fillText((G.holeIndex+1)+'',p.x,p.y-19*s);
+  ctx.font=Math.max(5,5.5*s)+'px "Press Start 2P",monospace';ctx.fillText('PAR '+h.par,p.x,p.y-12.5*s);
+  ctx.textAlign='left';
+}
+// --- golfista por partes (piernas/torso/cabeza + brazo/palo procedural) ---
 function drawGolferAndBall(){
-  if(G.flight||G.roll||G.putt){
-    // durante el vuelo el golfista ya terminó el follow; dibujar bola+sombra
-    drawBallInFlight();
-    drawGolferSprite(true);
-    return;
-  }
-  drawGolferSprite(false);
-  // bola en el tee/posición (si no hubo MISS reciente la bola sigue ahí)
+  const sp=SPR[G.gi],g=golfer();
   const bp=proj(G.ball.x,G.ball.y,0);
-  if(bp){ctx.fillStyle='#00000055';ctx.beginPath();ctx.ellipse(bp.x,bp.y+2,5,2,0,0,7);ctx.fill();
-    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bp.x,bp.y,4.5,0,7);ctx.fill();}
-}
-function golferFeet(){
-  const bp=proj(G.ball.x,G.ball.y,0);
-  if(!bp) return {x:W/2-40,y:H-120};
-  return {x:bp.x-16, y:bp.y+2};
-}
-function drawGolferSprite(small){
-  const g=golfer(), pose=swingPose(), F=golferFeet();
-  const s=small?1.6:2.6;
-  const px=v=>Math.round(v);
-  ctx.save();ctx.translate(px(F.x),px(F.y));
-  const lean=pose.lean, crouch=pose.crouch;
+  const inAir=!!G.flight;
+  // pies: al lado de la bola (vista lateral mirando a la derecha)
+  let fx=W/2-46,fy=H-128;
+  if(bp){fx=bp.x-20;fy=bp.y+2;}
+  const PX=3; // tamaño de píxel
+  const follow=G.swing.stage==='follow';
+  const bent=!follow&&(G.swing.stage!=='pdown')||lieAt(G.ball.x,G.ball.y)==='green'&&G.swing.stage==='idle';
+  const legs=follow?sp.legsF:sp.legsA;
+  const torso=(follow||(!bent&&G.swing.stage==='idle'&&false))?sp.up:sp.bent;
+  const useUp=follow;
+  const T=useUp?sp.up:sp.bent;
+  ctx.imageSmoothingEnabled=false;
   // sombra
-  ctx.fillStyle='#00000044';ctx.beginPath();ctx.ellipse(6*s,2,12*s,3.4*s,0,0,7);ctx.fill();
-  const legH=13*s*(1-0.25*crouch), hipY=-legH, shY=hipY-13*s, headY=shY-8*s;
-  const leanX=lean*14*s;
-  // piernas
-  ctx.fillStyle=g.pants;
-  ctx.fillRect(px(-5*s),px(hipY),px(4*s),px(legH));            // atrás
-  ctx.fillRect(px(3*s+leanX*0.3),px(hipY),px(4*s),px(legH));   // adelante
-  // zapatos
-  ctx.fillStyle='#222';
-  ctx.fillRect(px(-7*s),px(-2*s),px(7*s),px(2.6*s));
-  ctx.fillRect(px(2*s+leanX*0.3),px(-2*s),px(7*s),px(2.6*s));
-  // torso (camisa con sombreado)
-  ctx.fillStyle=g.shirt;
-  ctx.fillRect(px(-4*s+leanX*0.5),px(shY),px(9*s),px(13*s));
-  ctx.fillStyle='#00000033';
-  ctx.fillRect(px(-4*s+leanX*0.5),px(shY),px(3*s),px(13*s));
-  // cabeza + gorra
-  ctx.fillStyle=g.skin;ctx.fillRect(px(-1*s+leanX),px(headY),px(8*s),px(7*s));
-  ctx.fillStyle=g.cap;ctx.fillRect(px(-2*s+leanX),px(headY-2.4*s),px(10*s),px(3*s));
-  ctx.fillRect(px(5*s+leanX),px(headY-1*s),px(5*s),px(1.6*s)); // visera
-  // brazos + palo (rotan con clubA alrededor de las manos/hombro)
-  const a=pose.clubA*Math.PI/180;
-  const hx=4*s+leanX, hy=shY+4*s; // manos
-  const Lp=(G.swing.stage==='pdown'||lieAt(G.ball.x,G.ball.y)==='green')?15*s:24*s;
-  const tipX=hx+Math.sin(a)*Lp, tipY=hy+Math.cos(a)*Lp;
-  ctx.strokeStyle=g.skin;ctx.lineWidth=3*s;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(2*s+leanX*0.7,shY+2*s);ctx.lineTo(hx,hy);ctx.stroke();
-  ctx.strokeStyle='#8d6e63';ctx.lineWidth=1.8*s;
-  ctx.beginPath();ctx.moveTo(hx,hy);ctx.lineTo(tipX,tipY);ctx.stroke();
-  ctx.fillStyle='#cfd8dc';ctx.fillRect(px(tipX-2*s),px(tipY-1*s),px(4.5*s),px(2.4*s)); // cabeza del palo
-  // flash de impacto
+  ctx.fillStyle='#00000044';ctx.beginPath();ctx.ellipse(fx+16*PX/2,fy+2,20*PX/2,3*PX/2,0,0,7);ctx.fill();
+  // piernas (12x10), torso encima, cabeza encima del torso
+  ctx.drawImage(legs,fx,fy-10*PX,12*PX,10*PX);
+  const tx=fx-1*PX,ty=fy-10*PX-(useUp?12:10)*PX+2*PX;
+  ctx.drawImage(T,tx,ty,T.width*PX,T.height*PX);
+  const hw=sp.head.width;
+  const hx=tx+(useUp?4:8)*PX-hw*PX/2, hy=ty-9*PX+2*PX;
+  ctx.drawImage(sp.head,hx,hy,hw*PX,9*PX);
+  // brazo + palo desde el hombro
+  const clubA=swingClubA()*Math.PI/180;
+  const shx=tx+(useUp?6:7)*PX, shy=ty+(useUp?4:5)*PX;
+  const putt=lieAt(G.ball.x,G.ball.y)==='green'||G.swing.stage==='pdown';
+  const Lp=(putt?13:22)*PX;
+  const tipX=shx+Math.sin(clubA)*Lp, tipY=shy+Math.cos(clubA)*Lp;
+  ctx.strokeStyle=g.skin;ctx.lineWidth=2.4*PX;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(shx-2*PX,shy);ctx.lineTo(shx+Math.sin(clubA)*Lp*0.55,shy+Math.cos(clubA)*Lp*0.55);ctx.stroke();
+  ctx.fillStyle='#f4f4f4'; // guante
+  ctx.fillRect(shx+Math.sin(clubA)*Lp*0.55-1.6*PX,shy+Math.cos(clubA)*Lp*0.55-1.6*PX,3.2*PX,3.2*PX);
+  ctx.strokeStyle='#9a8b7a';ctx.lineWidth=1.4*PX;
+  ctx.beginPath();ctx.moveTo(shx,shy);ctx.lineTo(tipX,tipY);ctx.stroke();
+  ctx.fillStyle=putt?'#cfd8dc':'#5d6b7a';
+  ctx.fillRect(tipX-2*PX,tipY-1*PX,4*PX,2.4*PX);
   if(G.swing.stage==='follow'&&G.swing.t<0.12){
-    ctx.fillStyle='#fff8';ctx.beginPath();ctx.arc(tipX,tipY,10*s*(1+G.swing.t*8),0,7);ctx.fill();
+    ctx.fillStyle='#ffffff88';ctx.beginPath();ctx.arc(tipX,tipY,8*PX*(1+G.swing.t*8),0,7);ctx.fill();
   }
-  ctx.restore();
+  // bola en reposo
+  if(!inAir&&!(G.roll||G.putt)&&bp){
+    ctx.fillStyle='#00000055';ctx.beginPath();ctx.ellipse(bp.x,bp.y+2,5,2,0,0,7);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bp.x,bp.y,4.5,0,7);ctx.fill();
+    ctx.fillStyle='#c00';ctx.beginPath();ctx.arc(bp.x-1.5,bp.y-1.5,1.3,0,7);ctx.fill();
+  }
+  if(inAir||G.roll||G.putt)drawBallMoving();
 }
-function drawBallInFlight(){
+function drawBallMoving(){
   const f=G.flight;
-  const drawOne=(wx,wy,h,alpha,r)=>{
-    const p=proj(wx,wy,h);if(!p)return;
-    ctx.globalAlpha=alpha;
+  const one=(wx,wy,h,al,r)=>{
+    const p=proj(wx,wy,h);if(!p)return;ctx.globalAlpha=al;
     const sh=proj(wx,wy,0);
-    if(sh){ctx.fillStyle='#0006';ctx.beginPath();ctx.ellipse(sh.x,sh.y,Math.max(1.5,r*p.f*0.8),Math.max(1,r*p.f*0.4),0,0,7);ctx.fill();}
+    if(sh){ctx.fillStyle='#0006';ctx.beginPath();ctx.ellipse(sh.x,sh.y,Math.max(1.5,r*p.f),Math.max(1,r*p.f*0.5),0,0,7);ctx.fill();}
     ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(p.x,p.y,Math.max(1.5,r),0,7);ctx.fill();
     ctx.globalAlpha=1;
   };
   if(f){
-    for(let i=0;i<f.trail.length;i+=2){const tp=f.trail[i];drawOne(tp.x,tp.y,tp.h||0,0.35,2);}
-    const bp=proj(f.x,f.y,f.h);
-    if(bp){
-      const sh=proj(f.x,f.y,0);
-      if(sh){ctx.fillStyle='#00000055';ctx.beginPath();ctx.ellipse(sh.x,sh.y,5,2.2,0,0,7);ctx.fill();}
-      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bp.x,bp.y,5,0,7);ctx.fill();
-      ctx.fillStyle='#c00';ctx.beginPath();ctx.arc(bp.x-1.5,bp.y-1.5,1.4,0,7);ctx.fill();
-    }
-  } else {
+    for(let i=0;i<f.trail.length;i+=2){const tp=f.trail[i];one(tp.x,tp.y,tp.h||0,0.35,2);}
+    one(f.x,f.y,f.h,1,5);
+  }else{
     const r=G.roll||G.putt;
-    if(r){const p=proj(r.x,r.y,0);
-      if(p){ctx.fillStyle='#0006';ctx.beginPath();ctx.ellipse(p.x,p.y+2,5,2,0,0,7);ctx.fill();
-        ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(p.x,p.y,4.5,0,7);ctx.fill();}}
+    if(r)one(r.x,r.y,0,1,4.5);
   }
 }
 function drawAimMarker(){
@@ -512,152 +698,24 @@ function drawAimMarker(){
   const s0=proj(G.ball.x,G.ball.y,0), s1=proj(ex,ey,0);
   if(!s0||!s1)return;
   ctx.strokeStyle=G.curve?'#40c4ff':'#ffffffdd';ctx.setLineDash([8,6]);ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(s0.x,s0.y-4);
-  // curva prevista si hay hook/slice
-  const midx=(s0.x+s1.x)/2+(G.curve*40), midy=(s0.y+s1.y)/2-10;
-  ctx.quadraticCurveTo(midx,midy,s1.x,s1.y);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(s0.x,s0.y-30);
+  ctx.quadraticCurveTo((s0.x+s1.x)/2+G.curve*40,(s0.y+s1.y)/2-14,s1.x,s1.y);ctx.stroke();
+  ctx.setLineDash([]);ctx.lineWidth=1;
   const pulse=3+Math.sin(performance.now()/200)*1.2;
   ctx.strokeStyle='#ffeb3b';ctx.lineWidth=2;
   ctx.beginPath();ctx.arc(s1.x,s1.y,pulse+3,0,7);ctx.stroke();ctx.lineWidth=1;
-  ctx.fillStyle='#000a';ctx.font='bold 12px monospace';
-  const label=club.id==='PT'?'dirección':('carry ~'+rr.toFixed(0)+'y');
+  ctx.font='8px "Press Start 2P",monospace';
+  const label=club.id==='PT'?'DIR':'~'+rr.toFixed(0)+'y';
   const tw=ctx.measureText(label).width;
-  ctx.fillRect(s1.x-tw/2-4,s1.y-30,tw+8,17);
-  ctx.fillStyle='#ffeb3b';ctx.fillText(label,s1.x-tw/2,s1.y-17);
-  if(G.curve){ctx.fillStyle='#40c4ff';ctx.font='bold 13px monospace';ctx.fillText(G.curve<0?'◀ HOOK':'SLICE ▶',s0.x+24,s0.y-24);}
+  ctx.fillStyle='#000a';ctx.fillRect(s1.x-tw/2-4,s1.y-28,tw+8,16);
+  ctx.fillStyle='#ffeb3b';ctx.fillText(label,s1.x-tw/2,s1.y-16);
+  if(G.curve){ctx.fillStyle='#40c4ff';ctx.fillText(G.curve<0?'HOOK':'SLICE',s0.x+24,s0.y-60);}
 }
 function drawMinimap(){
-  const mw=210,mh=118,mx=W-mw-12,my=12;
+  const mw=210,mh=112,mx=W-mw-12,my=12;
   const h=hole();
-  ctx.fillStyle='#000b';ctx.fillRect(mx-4,my-4,mw+8,mh+8);
-  ctx.strokeStyle='#ffd23f';ctx.strokeRect(mx-4,my-4,mw+8,mh+8);
-  const x0=h.tee.x-30,x1=h.pin.x+50;
-  const X=wx=>mx+(wx-x0)/(x1-x0)*mw;
-  const ys=[h.tee.y,h.pin.y];for(const b of h.bunkers)ys.push(b.y-b.ry,b.y+b.ry);
-  for(const w of h.water)ys.push(w.y-w.ry,w.y+w.ry);
-  for(const t of h.trees)ys.push(t.y);
-  let y0=Math.min.apply(null,ys)-30,y1=Math.max.apply(null,ys)+30;
-  const Y=wy=>my+(1-(wy-y0)/(y1-y0))*mh;
-  // fairway
-  ctx.strokeStyle='#5cc46a';ctx.lineWidth=8;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(X(h.tee.x),Y(h.tee.y));ctx.lineTo(X(h.pin.x),Y(h.pin.y));ctx.stroke();
-  // agua/bunkers/green
-  ctx.fillStyle='#2f9fd8';for(const w of h.water){ctx.beginPath();ctx.ellipse(X(w.x),Y(w.y),Math.max(2,w.rx/(x1-x0)*mw),Math.max(1.5,w.ry/(y1-y0)*mh),0,0,7);ctx.fill();}
-  ctx.fillStyle='#ecd88f';for(const b of h.bunkers){ctx.beginPath();ctx.ellipse(X(b.x),Y(b.y),Math.max(2,b.rx/(x1-x0)*mw),Math.max(1.5,b.ry/(y1-y0)*mh),0,0,7);ctx.fill();}
-  ctx.fillStyle='#75e384';ctx.beginPath();ctx.ellipse(X(h.pin.x),Y(h.pin.y),Math.max(3,h.green.rx/(x1-x0)*mw),Math.max(2,h.green.ry/(y1-y0)*mh),0,0,7);ctx.fill();
-  ctx.fillStyle='#fff';ctx.fillRect(X(h.tee.x)-2,Y(h.tee.y)-2,4,4);
-  ctx.fillStyle='#f00';ctx.beginPath();ctx.arc(X(h.pin.x),Y(h.pin.y),3,0,7);ctx.fill();
-  // bola + aim
-  const rr=CLUBS[G.clubIndex].id==='PT'?28:Math.min(CLUBS[G.clubIndex].max*driveScale(),distToPin(G.ball.x,G.ball.y));
-  ctx.strokeStyle='#fff';ctx.setLineDash([4,3]);
-  ctx.beginPath();ctx.moveTo(X(G.ball.x),Y(G.ball.y));
-  ctx.lineTo(X(G.ball.x+Math.cos(G.aim)*rr),Y(G.ball.y+Math.sin(G.aim)*rr));ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(X(G.ball.x),Y(G.ball.y),3.4,0,7);ctx.fill();
-  ctx.fillStyle='#ffd23f';ctx.font='10px monospace';ctx.fillText('MAP',mx,my+mh+12);
-}
-// --- gauge vertical arcade (POWER + HEIGHT en el mismo mástil) ---
-function drawGauge(){
-  if(G.screen!=='play')return;
-  const gx=W-64,gw=34,gy=150,gh=H-150-120;
-  ctx.fillStyle='#000c';ctx.fillRect(gx-30,gy-34,gw+38,gh+84);
-  ctx.fillStyle='#ffd23f';ctx.font='bold 12px monospace';ctx.textAlign='center';
-  ctx.fillText('POWER',gx+gw/2,gy-18);
-  ctx.fillText(CLUBS[G.clubIndex].name,gx+gw/2,gy-4);
-  ctx.textAlign='left';
-  ctx.fillStyle='#1a1a1a';ctx.fillRect(gx,gy,gw,gh);
-  const cap=powerCap(),segs=36;
-  for(let i=0;i<segs;i++){
-    const f0=i/segs,f1=(i+1)/segs,fm=(f0+f1)/2;
-    ctx.fillStyle=fm>1?'#b388ff':fm>0.85?'#ff5252':fm>0.6?'#ffb300':'#00e676';
-    const y1=gy+gh-(f1/cap)*gh, y0=gy+gh-(f0/cap)*gh;
-    const on=G.meter&&G.meter.phase==='power'?fm<=G.meter.p:(G.meter?fm<=G.meter.power:fm<0.001);
-    if(on)ctx.fillRect(gx+3,y1+1,gw-6,Math.max(1,y0-y1-1));
-  }
-  ctx.strokeStyle='#fff';ctx.strokeRect(gx,gy,gw,gh);
-  // línea 100%
-  const y100=gy+gh-(1/cap)*gh;
-  ctx.strokeStyle='#fff';ctx.beginPath();ctx.moveTo(gx-4,y100);ctx.lineTo(gx+gw+4,y100);ctx.stroke();
-  // guideline de putt
-  if(lieAt(G.ball.x,G.ball.y)==='green'){
-    const n=puttNeed(),gyp=gy+gh-(n/cap)*gh;
-    ctx.fillStyle='#40c4ff';ctx.fillRect(gx-6,gyp-2,gw+12,4);
-  }
-  // cursor HEIGHT: barre el mástil; rojo=MISS, blanco=perfect
-  if(G.meter&&G.meter.phase==='height'){
-    const lie=G.meter.lie,rz=redZone(lie),sw=heightSweet();
-    ctx.fillStyle='#c62828';
-    ctx.fillRect(gx,gy,gw,rz*gh);
-    ctx.fillRect(gx,gy+gh*(1-rz),gw,rz*gh);
-    ctx.fillStyle='#fff';
-    const yc=gy+gh/2, hh=sw*gh;
-    ctx.fillRect(gx,yc-hh,gw,hh*2);
-    const yp=gy+gh-G.meter.p*gh;
-    ctx.fillStyle='#00e5ff';ctx.fillRect(gx-5,yp-2,gw+10,5);
-    ctx.fillStyle='#fff';ctx.font='10px monospace';
-    ctx.fillText(lie.toUpperCase(),gx-24,gy+gh+14);
-  }
-  if(G.meter&&G.meter.phase==='power'){
-    ctx.fillStyle='#fff';ctx.font='bold 11px monospace';
-    ctx.fillText((G.meter.p*100).toFixed(0)+'%',gx-8,gy+gh+14);
-  }
-  // hint contextual
-  ctx.fillStyle='#fff';ctx.font='12px monospace';
-  let hint='';
-  if(G.holed)hint='ESPACIO: siguiente hoyo';
-  else if(G.flight)hint='···';
-  else if(!G.meter)hint='ESPACIO: swing · Z:hook X:slice C:recto';
-  else if(G.meter.phase==='power')hint='¡FIJA LA POTENCIA!';
-  else hint='¡CLAVA EL BLANCO!';
-  ctx.fillStyle='#000a';ctx.fillRect(12,H-30,ctx.measureText(hint).width+16,22);
-  ctx.fillStyle='#ffeb3b';ctx.fillText(hint,20,H-14);
-}
-function drawBanner(){
-  if(!G.banner)return;
-  const a=Math.min(1,G.banner.t);
-  ctx.globalAlpha=Math.min(1,a*2);
-  ctx.fillStyle='#000c';ctx.fillRect(0,H/2-44,W,72);
-  ctx.strokeStyle='#ffd23f';ctx.lineWidth=3;ctx.strokeRect(8,H/2-44,W-16,72);
-  ctx.fillStyle='#ffd23f';ctx.font='bold 40px monospace';ctx.textAlign='center';
-  ctx.fillText(G.banner.txt,W/2,H/2+12);
-  ctx.textAlign='left';ctx.globalAlpha=1;
-}
-function drawSelect(){
-  ctx.fillStyle='#0d2b16';ctx.fillRect(0,0,W,H);
-  drawSky();groundBase();
-  ctx.fillStyle='#000d';ctx.fillRect(60,60,W-120,H-190);
-  ctx.strokeStyle='#ffd23f';ctx.lineWidth=3;ctx.strokeRect(60,60,W-120,H-190);
-  ctx.fillStyle='#ffd23f';ctx.font='bold 26px monospace';ctx.textAlign='center';
-  ctx.fillText('★ NEO TURF MASTERS ★',W/2,105);
-  ctx.fillStyle='#fff';ctx.font='13px monospace';
-  ctx.fillText('Big Tournament Golf · elige golfista (1-6)',W/2,128);
-  GOLFERS.forEach((g,i)=>{
-    const y=155+i*40,sel=i===G.gi;
-    ctx.textAlign='left';
-    ctx.fillStyle=g.shirt;ctx.fillRect(90,y-12,14,14);
-    ctx.fillStyle=sel?'#ffd23f':'#fff';ctx.font=(sel?'bold ':'')+'14px monospace';
-    ctx.fillText((i+1)+'. '+g.name+' ('+g.ctry+')',112,y);
-    ctx.font='12px monospace';ctx.fillStyle=sel?'#ffe9a3':'#9ccc9c';
-    ctx.fillText('DRV'+g.drv+' ACC'+g.acc+' SKL'+g.skl+' REC'+g.rec+' PUT'+g.put,330,y);
-    if(g.id==='power'){ctx.fillStyle='#ff8a80';ctx.fillText('¡supera el 100%!',560,y);}
-  });
-  ctx.textAlign='left';
-  ctx.fillStyle='#9ccc9c';ctx.font='12px monospace';
-  ctx.fillText('Vista trasera con swing animado · gauge vertical · putting con slope',90,H-160);
-  ctx.fillStyle='#fff';ctx.font='bold 14px monospace';
-  ctx.fillText('ESPACIO o click: salir al hoyo',90,H-138);
-}
-function drawIntro(){
-  const h=hole();
-  ctx.fillStyle='#0d2b16';ctx.fillRect(0,0,W,H);
-  const names=['1st','2nd','3rd'];
-  ctx.fillStyle='#ffd23f';ctx.font='bold 34px monospace';ctx.textAlign='center';
-  ctx.fillText((names[G.holeIndex]||(G.holeIndex+1)+'th')+' HOLE · PAR '+h.par,W/2,60);
-  ctx.fillStyle='#fff';ctx.font='15px monospace';
-  ctx.fillText(holeLen().toFixed(0)+' yards · viento '+G.wind.mph.toFixed(0)+' mph · '+golfer().name,W/2,86);
-  // mapa cenital grande
-  const mx=130,my=120,mw=W-260,mh=H-240;
-  ctx.fillStyle='#1d6b2a';ctx.fillRect(mx,my,mw,mh);
-  ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.strokeRect(mx,my,mw,mh);
+  ctx.fillStyle='#000b';ctx.fillRect(mx-5,my-5,mw+10,mh+22);
+  ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.strokeRect(mx-5,my-5,mw+10,mh+22);ctx.lineWidth=1;
   const x0=h.tee.x-30,x1=h.pin.x+50;
   const X=wx=>mx+(wx-x0)/(x1-x0)*mw;
   const ys=[h.tee.y,h.pin.y];for(const b of h.bunkers)ys.push(b.y-b.ry,b.y+b.ry);
@@ -665,24 +723,165 @@ function drawIntro(){
   for(const t of h.trees)ys.push(t.y);
   const y0=Math.min.apply(null,ys)-30,y1=Math.max.apply(null,ys)+30;
   const Y=wy=>my+(1-(wy-y0)/(y1-y0))*mh;
-  ctx.strokeStyle='#5cc46a';ctx.lineWidth=26;ctx.lineCap='round';
+  ctx.strokeStyle='#5cc46a';ctx.lineWidth=7;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(X(h.tee.x),Y(h.tee.y));ctx.lineTo(X(h.pin.x),Y(h.pin.y));ctx.stroke();
+  ctx.fillStyle='#2f9fd8';for(const w of h.water){ctx.beginPath();ctx.ellipse(X(w.x),Y(w.y),Math.max(2,w.rx/(x1-x0)*mw),Math.max(1.5,w.ry/(y1-y0)*mh),0,0,7);ctx.fill();}
+  ctx.fillStyle='#ecd88f';for(const b of h.bunkers){ctx.beginPath();ctx.ellipse(X(b.x),Y(b.y),Math.max(2,b.rx/(x1-x0)*mw),Math.max(1.5,b.ry/(y1-y0)*mh),0,0,7);ctx.fill();}
+  ctx.fillStyle='#75e384';ctx.beginPath();ctx.ellipse(X(h.pin.x),Y(h.pin.y),Math.max(3,h.green.rx/(x1-x0)*mw),Math.max(2,h.green.ry/(y1-y0)*mh),0,0,7);ctx.fill();
+  ctx.fillStyle='#fff';ctx.fillRect(X(h.tee.x)-2,Y(h.tee.y)-2,4,4);
+  ctx.fillStyle='#f00';ctx.beginPath();ctx.arc(X(h.pin.x),Y(h.pin.y),3,0,7);ctx.fill();
+  const rr=CLUBS[G.clubIndex].id==='PT'?28:Math.min(CLUBS[G.clubIndex].max*driveScale(),distToPin(G.ball.x,G.ball.y));
+  ctx.strokeStyle='#fff';ctx.setLineDash([4,3]);
+  ctx.beginPath();ctx.moveTo(X(G.ball.x),Y(G.ball.y));
+  ctx.lineTo(X(G.ball.x+Math.cos(G.aim)*rr),Y(G.ball.y+Math.sin(G.aim)*rr));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(X(G.ball.x),Y(G.ball.y),3.4,0,7);ctx.fill();
+  ctx.fillStyle='#ffd23f';ctx.font='8px "Press Start 2P",monospace';ctx.fillText('MAP',mx,my+mh+14);
+}
+function drawGauge(){
+  if(G.screen!=='play')return;
+  const gx=W-64,gw=34,gy=150,gh=H-150-118;
+  const F='8px "Press Start 2P",monospace';
+  ctx.fillStyle='#000c';ctx.fillRect(gx-34,gy-44,gw+42,gh+96);
+  ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.strokeRect(gx-34,gy-44,gw+42,gh+96);ctx.lineWidth=1;
+  ctx.fillStyle='#ffd23f';ctx.font=F;ctx.textAlign='center';
+  ctx.fillText('POWER',gx+gw/2,gy-28);
+  ctx.fillStyle='#fff';ctx.fillText(CLUBS[G.clubIndex].id,gx+gw/2,gy-14);
+  ctx.textAlign='left';
+  ctx.fillStyle='#1a1a1a';ctx.fillRect(gx,gy,gw,gh);
+  const cap=powerCap(),segs=30;
+  for(let i=0;i<segs;i++){
+    const fm=(i+0.5)/segs;
+    ctx.fillStyle=fm>1?'#b388ff':fm>0.85?'#ff5252':fm>0.6?'#ffb300':'#00e676';
+    const y1=gy+gh-((i+1)/segs/cap)*gh, y0=gy+gh-(i/segs/cap)*gh;
+    const on=G.meter&&G.meter.phase==='power'?fm<=G.meter.p:(G.meter?fm<=G.meter.power:false);
+    if(on)ctx.fillRect(gx+3,y1+1,gw-6,Math.max(1,y0-y1-1));
+  }
+  // marco segmentado estilo arcade
+  ctx.strokeStyle='#000';
+  for(let i=0;i<=segs;i++){const y=gy+gh-(i/segs/cap)*gh;ctx.beginPath();ctx.moveTo(gx,y);ctx.lineTo(gx+gw,y);ctx.stroke();}
+  ctx.strokeStyle='#fff';ctx.strokeRect(gx,gy,gw,gh);
+  const y100=gy+gh-(1/cap)*gh;
+  ctx.fillStyle='#fff';ctx.fillRect(gx-5,y100-1,gw+10,2);
+  if(lieAt(G.ball.x,G.ball.y)==='green'){
+    const gyp=gy+gh-(puttNeed()/cap)*gh;
+    ctx.fillStyle='#40c4ff';ctx.fillRect(gx-7,gyp-2,gw+14,4);
+  }
+  if(G.meter&&G.meter.phase==='height'){
+    const lie=G.meter.lie,rz=redZone(lie),sw=heightSweet();
+    ctx.fillStyle='#c62828';
+    ctx.fillRect(gx,gy,gw,rz*gh);ctx.fillRect(gx,gy+gh*(1-rz),gw,rz*gh);
+    ctx.fillStyle='#fff';
+    ctx.fillRect(gx,gy+gh/2-sw*gh,gw,sw*gh*2);
+    const yp=gy+gh-G.meter.p*gh;
+    ctx.fillStyle='#00e5ff';ctx.fillRect(gx-6,yp-2,gw+12,5);
+    ctx.fillStyle='#fff';ctx.font='7px "Press Start 2P",monospace';
+    ctx.fillText(lie.toUpperCase(),gx-28,gy+gh+14);
+  }
+  if(G.meter&&G.meter.phase==='power'){
+    ctx.fillStyle='#fff';ctx.font=F;
+    ctx.fillText((G.meter.p*100).toFixed(0)+'%',gx-12,gy+gh+16);
+  }
+  ctx.font='8px "Press Start 2P",monospace';
+  let hint='';
+  if(G.holed)hint='ESPACIO: SIGUIENTE';
+  else if(G.flight)hint='...';
+  else if(!G.meter)hint='ESPACIO: SWING Z:X HOOK C:RECTO';
+  else if(G.meter.phase==='power')hint='FIJA POTENCIA!';
+  else hint='CLAVA EL BLANCO!';
+  ctx.fillStyle='#000a';ctx.fillRect(10,H-28,ctx.measureText(hint).width+14,20);
+  ctx.fillStyle='#ffeb3b';ctx.fillText(hint,17,H-14);
+}
+function drawBanner(){
+  if(!G.banner)return;
+  ctx.globalAlpha=Math.min(1,G.banner.t*2);
+  ctx.fillStyle='#000d';ctx.fillRect(0,H/2-46,W,76);
+  ctx.strokeStyle='#ffd23f';ctx.lineWidth=3;ctx.strokeRect(10,H/2-46,W-20,76);ctx.lineWidth=1;
+  ctx.fillStyle='#ffd23f';ctx.font='28px "Press Start 2P",monospace';ctx.textAlign='center';
+  ctx.strokeStyle='#000';ctx.lineWidth=5;ctx.strokeText(G.banner.txt,W/2,H/2+8);
+  ctx.fillText(G.banner.txt,W/2,H/2+8);
+  ctx.textAlign='left';ctx.globalAlpha=1;ctx.lineWidth=1;
+}
+function drawSelect(){
+  // fondo oliva como el original + textura
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#5a5a1e');g.addColorStop(1,'#2d2d10');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#ffffff08';
+  for(let i=0;i<40;i++)ctx.fillRect(Math.random()*0+ (i*97)%W,(i*53)%H,3,3);
+  ctx.fillStyle='#f4f4f4';ctx.font='italic bold 24px "Brush Script MT","Segoe Script",cursive';ctx.textAlign='center';
+  ctx.fillText('Golfer Selection',W/2,34);
+  ctx.textAlign='left';
+  GOLFERS.forEach((gf,i)=>{
+    const y=112+i*62,sel=i===G.gi;
+    if(sel){ctx.fillStyle='#ffd23f22';ctx.fillRect(40,y-46,W-80,62);}
+    ctx.strokeStyle=sel?'#ffd23f':'#888';ctx.lineWidth=sel?3:1;
+    ctx.strokeRect(40,y-46,W-80,62);ctx.lineWidth=1;
+    // retrato pixel
+    const sp=SPR[i],PS=4;
+    ctx.imageSmoothingEnabled=false;
+    ctx.fillStyle='#1d3b22';ctx.fillRect(52,y-40,10*PS,10*PS);
+    ctx.drawImage(sp.head,52,y-40,10*PS,10*PS);
+    ctx.fillStyle=gf.shirt;ctx.fillRect(52,y-40+10*PS,10*PS,3*PS);
+    // bandera
+    const fl=FLAGS[gf.ctry];
+    for(let r=0;r<9;r++)for(let c=0;c<12;c++){ctx.fillStyle=FCOL[fl[r][c]];ctx.fillRect(52+10*PS+8+c*2,y-40+r*2,2,2);}
+    ctx.fillStyle=sel?'#ffd23f':'#fff';ctx.font='9px "Press Start 2P",monospace';
+    ctx.fillText((i+1)+'. '+gf.name,150,y-24);
+    ctx.fillStyle='#ffd23f';ctx.font='7px "Press Start 2P",monospace';
+    ctx.fillText(gf.nick,150,y-10);
+    // stat bars segmentadas como el original
+    const stats=[['DRV',gf.drv,'#ff5252'],['ACC',gf.acc,'#ffb300'],['SKL',gf.skl,'#ffeb3b'],['REC',gf.rec,'#00e676'],['PUT',gf.put,'#40c4ff']];
+    stats.forEach((st,k)=>{
+      const bx=420+k*100;
+      ctx.fillStyle='#888';ctx.fillText(st[0],bx,y-24);
+      for(let sgm=0;sgm<5;sgm++){
+        ctx.fillStyle=sgm<st[1]?st[2]:'#333';
+        ctx.fillRect(bx+sgm*11,y-18,9,8);
+        ctx.strokeStyle='#000';ctx.strokeRect(bx+sgm*11,y-18,9,8);
+      }
+    });
+  });
+  ctx.fillStyle='#fff';ctx.font='9px "Press Start 2P",monospace';ctx.textAlign='center';
+  ctx.fillText('PULSA ESPACIO O CLICK PARA SALIR',W/2,H-18);
+  ctx.textAlign='left';
+}
+function drawIntro(){
+  const h=hole();
+  ctx.fillStyle='#0d2b16';ctx.fillRect(0,0,W,H);
+  const names=['1st','2nd','3rd'];
+  ctx.fillStyle='#ffd23f';ctx.font='24px "Press Start 2P",monospace';ctx.textAlign='center';
+  ctx.fillText((names[G.holeIndex]||(G.holeIndex+1)+'th')+' HOLE  PAR '+h.par,W/2,56);
+  ctx.fillStyle='#fff';ctx.font='10px "Press Start 2P",monospace';
+  ctx.fillText(holeLen().toFixed(0)+' YARDS · WIND '+G.wind.mph.toFixed(0)+' MPH · '+golfer().name,W/2,84);
+  const mx=130,my=116,mw=W-260,mh=H-240;
+  ctx.fillStyle='#1d6b2a';ctx.fillRect(mx,my,mw,mh);
+  ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.strokeRect(mx,my,mw,mh);ctx.lineWidth=1;
+  const x0=h.tee.x-30,x1=h.pin.x+50;
+  const X=wx=>mx+(wx-x0)/(x1-x0)*mw;
+  const ys=[h.tee.y,h.pin.y];for(const b of h.bunkers)ys.push(b.y-b.ry,b.y+b.ry);
+  for(const w of h.water)ys.push(w.y-w.ry,w.y+w.ry);
+  for(const t of h.trees)ys.push(t.y);
+  const y0=Math.min.apply(null,ys)-30,y1=Math.max.apply(null,ys)+30;
+  const Y=wy=>my+(1-(wy-y0)/(y1-y0))*mh;
+  ctx.strokeStyle='#5cc46a';ctx.lineWidth=24;ctx.lineCap='round';
   ctx.beginPath();ctx.moveTo(X(h.tee.x),Y(h.tee.y));ctx.lineTo(X(h.pin.x),Y(h.pin.y));ctx.stroke();
   ctx.fillStyle='#2f9fd8';for(const w of h.water){ctx.beginPath();ctx.ellipse(X(w.x),Y(w.y),w.rx/(x1-x0)*mw,w.ry/(y1-y0)*mh,0,0,7);ctx.fill();}
   ctx.fillStyle='#ecd88f';for(const b of h.bunkers){ctx.beginPath();ctx.ellipse(X(b.x),Y(b.y),b.rx/(x1-x0)*mw,b.ry/(y1-y0)*mh,0,0,7);ctx.fill();}
   ctx.fillStyle='#14521f';for(const t of h.trees){ctx.beginPath();ctx.arc(X(t.x),Y(t.y),5,0,7);ctx.fill();}
-  ctx.fillStyle='#75e384';ctx.beginPath();ctx.ellipse(X(h.pin.x),Y(h.pin.y),h.green.rx/(x1-x0)*mw,h.green.ry/(y1-y0)*mh,0,0,7);ctx.fill();
+  ctx.fillStyle='#8be08b';ctx.beginPath();ctx.ellipse(X(h.pin.x),Y(h.pin.y),(h.green.rx*1.25)/(x1-x0)*mw,(h.green.ry*1.3)/(y1-y0)*mh,0,0,7);ctx.fill();
+  ctx.fillStyle='#5fd46e';ctx.beginPath();ctx.ellipse(X(h.pin.x),Y(h.pin.y),h.green.rx/(x1-x0)*mw,h.green.ry/(y1-y0)*mh,0,0,7);ctx.fill();
   ctx.fillStyle='#fff';ctx.fillRect(X(h.tee.x)-3,Y(h.tee.y)-3,6,6);
   ctx.fillStyle='#f00';ctx.beginPath();ctx.arc(X(h.pin.x),Y(h.pin.y),5,0,7);ctx.fill();
-  ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='bold 15px monospace';
+  ctx.fillStyle='#fff';ctx.font='10px "Press Start 2P",monospace';
   ctx.fillText('ESPACIO: TEE OFF',W/2,H-40);
   ctx.textAlign='left';
 }
 
-// ---------- 8. INPUT ----------
+// ---------- 10. INPUT ----------
 function beginPlay(){
   G.screen='intro';
   const h=hole();
-  G.ball={x:h.tee.x,y:h.tee.y,h:0};G.prev={...G.ball};G.lastSafe={...G.ball};
+  G.ball={x:h.tee.x,y:h.tee.y,h:0};G.prev={x:h.tee.x,y:h.tee.y};G.lastSafe={x:h.tee.x,y:h.tee.y};
   G.camX=G.ball.x-14;
   autoAimClub();
 }
@@ -697,16 +896,15 @@ document.addEventListener('keydown',e=>{
   }
   if(G.screen==='intro'){
     if(k==='Space'||k==='Enter')G.screen='play';
-    if(k.indexOf('Digit')===0){const n=+k.slice(5);if(n>=1&&n<=6)G.gi=n-1;}
     return;
   }
   if(k==='ArrowLeft')G.aim-=0.028;
   else if(k==='ArrowRight')G.aim+=0.028;
   else if(k==='ArrowUp'){G.clubIndex=Math.max(0,G.clubIndex-1);updateHUD();}
   else if(k==='ArrowDown'){G.clubIndex=Math.min(6,G.clubIndex+1);updateHUD();}
-  else if(k==='KeyZ'){G.curve=-1;setMsg('HOOK armado (B)');}
-  else if(k==='KeyX'){G.curve=1;setMsg('SLICE armado (C)');}
-  else if(k==='KeyC'){G.curve=0;setMsg('Tiro recto');}
+  else if(k==='KeyZ'){G.curve=-1;setMsg('HOOK (B)');}
+  else if(k==='KeyX'){G.curve=1;setMsg('SLICE (C)');}
+  else if(k==='KeyC'){G.curve=0;setMsg('RECTO');}
   else if(k==='KeyR')autoAimClub();
   else if(k==='Space'){
     if(G.holed){nextHole();return;}
@@ -733,7 +931,7 @@ function updateHUD(){
   document.getElementById('windArrow').style.transform='rotate('+G.wind.ang+'rad)';
   document.getElementById('hudStroke').textContent=G.stroke;
   const d=distToPin(G.ball.x,G.ball.y);
-  document.getElementById('hudClub').textContent=club.name+' · '+(club.max*driveScale()).toFixed(0)+'y · '+d.toFixed(0)+'y · '+lieAt(G.ball.x,G.ball.y);
+  document.getElementById('hudClub').textContent=club.name+' '+(club.max*driveScale()).toFixed(0)+'y '+d.toFixed(0)+'y '+lieAt(G.ball.x,G.ball.y);
 }
 let AC=null;
 function tone(f,dur,delay){
@@ -754,17 +952,17 @@ function snd(kind){
   else if(kind==='hole'){tone(523,0.12);tone(659,0.12,0.12);tone(784,0.12,0.24);tone(1046,0.3,0.36);}
 }
 
-// ---------- 9. GAME LOOP ----------
+// ---------- 11. GAME LOOP ----------
 let last=performance.now();
 function loop(now){
   const dt=Math.min(0.05,(now-last)/1000);last=now;
-  G.cloudT+=dt;
+  G.cloudT+=dt;G.birdT+=dt;
   if(G.banner){G.banner.t-=dt;if(G.banner.t<=0)G.banner=null;}
   if(G.screen==='play'){
     const sw=G.swing;
     if(sw.stage==='back'&&!G.meter)sw.stage='idle';
     if(sw.stage==='top'&&(!G.meter||G.meter.phase!=='height'))sw.stage='idle';
-    if(sw.stage==='down'||sw.stage==='pdown'){sw.t+=dt;if(sw.t>=0.15){impact();}}
+    if(sw.stage==='down'||sw.stage==='pdown'){sw.t+=dt;if(sw.t>=0.15)impact();}
     else if(sw.stage==='follow'){sw.t+=dt;if(sw.t>0.55&&!G.flight)sw.stage='idle';}
     if(G.meter){
       const sp=meterSpeed(G.meter.lie)*(G.meter.phase==='power'?0.9:1.25);
@@ -781,7 +979,6 @@ function loop(now){
     if(G.flight)stepFlight(dt);
     else if(G.roll)stepRoll(dt);
     else if(G.putt)stepPutt(dt);
-    // la cámara persigue suave hasta detrás de la bola (salvo en vuelo)
     if(!G.flight){
       const onG=lieAt(G.ball.x,G.ball.y)==='green';
       const wantK=onG?30:55, wantX=G.ball.x-(onG?8:14);
@@ -791,7 +988,6 @@ function loop(now){
   draw();
   requestAnimationFrame(loop);
 }
-G.camY=function(){return G.ball.y*0.15;};
 updateHUD();
 requestAnimationFrame(loop);
 </script>
