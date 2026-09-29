@@ -1,0 +1,13 @@
+{
+  "name": "neoturf-masters-online",
+  "version": "0.1.0",
+  "description": "Juego arcade golf estilo Neo Turf Masters - multijugador online navegador",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}

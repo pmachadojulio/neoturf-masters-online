@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NeoTurf Masters Online — MVP</title>
+<link rel="stylesheet" href="style.css"/>
+<script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>⛳ NEO TURF <span>MASTERS ONLINE</span></h1>
+    <div id="roomUI">
+      <input id="name" placeholder="Tu nombre" value="Yo" maxlength="12"/>
+      <button id="btnCreate">Crear sala</button>
+      <input id="code" placeholder="CÓDIGO" maxlength="4" style="width:70px;text-transform:uppercase"/>
+      <button id="btnJoin">Unirse</button>
+      <span id="roomLabel"></span>
+    </div>
+  </header>
+  <div id="wrap">
+    <canvas id="game" width="1000" height="600"></canvas>
+    <div id="hud">
+      <div id="info">← → apuntar · ESPACIO: iniciar / potencia / impacto · R: re-apuntar</div>
+      <div id="status">Modo local: juega tú solo para probar. Crea sala para online.</div>
+      <div id="meter"><div id="power"></div><div id="cursor"></div><div id="sweet"></div></div>
+      <div id="club"></div>
+    </div>
+  </div>
+  <footer>Par 4 · Hoyo 1 · MVP fiel a Neo Turf: doble toque de precisión, viento, rough/bunker/green mejorados en HD.</footer>
+</div>
+<script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+body{margin:0;background:#0b1e13;color:#fff;font-family:system-ui,Arial}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#102913;border-bottom:2px solid #2ecc71}
+h1{font-size:20px;margin:0;letter-spacing:1px} h1 span{color:#2ecc71}
+#roomUI input,button{padding:6px 10px;border-radius:8px;border:0;margin-right:6px}
+button{background:#2ecc71;font-weight:700;cursor:pointer}
+#wrap{display:flex;gap:12px;padding:12px;justify-content:center;flex-wrap:wrap}
+canvas{background:#2a7d3a;border-radius:12px;box-shadow:0 10px 40px #0008;max-width:96vw;height:auto}
+#hud{width:300px;background:#122b1a;padding:12px;border-radius:12px}
+#meter{position:relative;height:22px;background:#08130c;border:1px solid #2ecc71;border-radius:6px;margin:10px 0;overflow:hidden}
+#power{height:100%;width:0;background:linear-gradient(90deg,#2ecc71,#f1c40f 70%,#e74c3c)}
+#cursor{position:absolute;top:0;bottom:0;width:3px;background:#fff;left:0}
+#sweet{position:absolute;top:0;bottom:0;left:47%;width:6%;background:#ffffff55;border-left:1px solid #fff;border-right:1px solid #fff}
+#status{font-size:14px;min-height:60px}#club{font-size:14px;color:#f1c40f}#info{font-size:12px;opacity:.8}
+footer{padding:8px;text-align:center;opacity:.6;font-size:12px}
