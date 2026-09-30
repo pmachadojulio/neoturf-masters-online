@@ -57,7 +57,7 @@ const GOLFERS = [
   {name:'ROBERT LANDORT', nick:'SHOT MAKER', ctry:'GER', drv:4, acc:5, skl:2, rec:2, put:4,
    shirt:'#c8b83d', dark:'#8b7d2d', pants:'#1a1a1a', skin:'#f0c090', hair:'#b8b8b8', feat:'stern'},
   {name:'FERNANDO ALMEIDA', nick:'POWER GOLFER', ctry:'BRA', drv:5, acc:1, skl:1, rec:1, put:1,
-   shirt:'#2d9b4d', dark:'#1d6b32', pants:'#1d4b22', skin:'#8b5a32', hair:'#1a1a1a', feat:'band'},
+    shirt:'#2d9b4d', dark:'#1d6b32', pants:'#1d4b22', skin:'#8b5a32', sd:'#5f3c1e', hair:'#1a1a1a', feat:'band'},
   {name:'TOYOSHIGE TAKENO', nick:'PUTT MASTER', ctry:'JPN', drv:3, acc:2, skl:4, rec:2, put:5,
    shirt:'#8b3d9b', dark:'#5d2d6b', pants:'#2d1d4b', skin:'#f0c090', hair:'#111', feat:'visor'},
 ];
@@ -404,7 +404,7 @@ sun.position.set(60,110,40);scene.add(sun);
 }
 // bola + sombra + estela
 ballMesh=new THREE.Mesh(new THREE.SphereGeometry(0.42,14,10),
-  new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.35}));
+  new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,emissive:0x666666}));
 scene.add(ballMesh);
 shadowMesh=new THREE.Mesh(new THREE.CircleGeometry(0.5,16),
   new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.35,depthWrite:false}));
@@ -412,11 +412,11 @@ shadowMesh.rotation.x=-Math.PI/2;scene.add(shadowMesh);
 trailLine=new THREE.Line(new THREE.BufferGeometry(),
   new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.65}));
 trailLine.frustumCulled=false;scene.add(trailLine);
-// golfista billboard (textura dibujada con nuestro pixel-art)
-golferCanvas=document.createElement('canvas');golferCanvas.width=golferCanvas.height=72;
+// golfista billboard (frames dibujados a mano, estilo arcade)
+golferCanvas=document.createElement('canvas');golferCanvas.width=34;golferCanvas.height=48;
 golferTex=new THREE.CanvasTexture(golferCanvas);golferTex.magFilter=THREE.NearestFilter;
 golferSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:golferTex,transparent:true}));
-golferSprite.scale.set(3.4,3.4,1);scene.add(golferSprite);
+golferSprite.scale.set(3.0,3.0,1);scene.add(golferSprite);
 // aim: línea punteada + anillo
 aimLine=new THREE.Line(new THREE.BufferGeometry(),
   new THREE.LineDashedMaterial({color:0xffffff,dashSize:1.4,gapSize:1.1}));
@@ -564,6 +564,32 @@ function buildCourse(){
     g.position.set(t.y,0,-t.x);
     courseGroup.add(g);
   }
+  // línea de pinos en el horizonte + Fuji con nieve tras el green
+  {
+    const far1=new THREE.MeshLambertMaterial({color:0x1d5b28,flatShading:true});
+    const far2=new THREE.MeshLambertMaterial({color:0x2f8f3e,flatShading:true});
+    for(let wx=h.tee.x-40;wx<h.pin.x+90;wx+=24){
+      const c=fairwayCenterAt(wx);
+      for(const s of [-1,1]){
+        const hh=((wx*13+s*71)%10+10)%10;
+        if(hh<2.5)continue;
+        const sc=2.0+hh*0.22, off=h.fairwayW/2+40+hh*3;
+        const g=new THREE.Group();
+        const c1=new THREE.Mesh(new THREE.ConeGeometry(3.2*sc/2.4,4.5*sc/2.4,6),far1);
+        c1.position.y=2.2*sc/2.4;g.add(c1);
+        const c2=new THREE.Mesh(new THREE.ConeGeometry(2.2*sc/2.4,3.4*sc/2.4,6),far2);
+        c2.position.y=4.2*sc/2.4;g.add(c2);
+        g.position.set(c.y+s*off,0,-wx);
+        courseGroup.add(g);
+      }
+    }
+    const fuji=new THREE.Mesh(new THREE.ConeGeometry(60,85,7),
+      new THREE.MeshLambertMaterial({color:0x5a7ab5,flatShading:true}));
+    fuji.position.set(h.pin.y+25,42,-(h.pin.x+200));courseGroup.add(fuji);
+    const snow=new THREE.Mesh(new THREE.ConeGeometry(60*0.38,85*0.36,7),
+      new THREE.MeshLambertMaterial({color:0xe8f4ff,flatShading:true}));
+    snow.position.set(h.pin.y+25,42+85*0.32,-(h.pin.x+200));courseGroup.add(snow);
+  }
   // bandera
   {
     const p=V3(h.pin.x,h.pin.y,0);
@@ -630,32 +656,383 @@ function updateCamera(dt){
   }
   camera.position.copy(camPos);camera.lookAt(camTgt);
 }
-// golfista → textura del billboard
+// FRAMES de swing dibujados a mano (vista lateral, mira a la derecha;
+// se espejan al dibujar porque la bola queda a la izquierda del sprite).
+// K=borde S/s=piel H=pelo T/t=camisa P=pantalón W/w=blanco N=vara D=cabeza G=grip
+const FRAMES={
+addr:[
+'..................................',
+'..................................',
+'...........WWWWWW.................',
+'..........WWWWWWWW................',
+'..........WwwwwwwW................',
+'.........HSSSSSSSSWW..............',
+'.........HSSSSSSSS................',
+'..........SSssSS..................',
+'...........SSSSS..................',
+'............SSS...................',
+'...........TTTTT..................',
+'..........TTTTTTT.................',
+'.........TTTTTTTTT................',
+'........TTTTTTTTTTT...............',
+'........TTtTTTTtTT................',
+'.......TTTTTTTTTTTTT..............',
+'......SSTTTTTTTTTTTSS.............',
+'......SsTTTTTTTTTTWW..............',
+'......SsTTTTTTTTTTWWN.............',
+'.......sTTTTTTTTTTWN..............',
+'........TTTTTTTTTTN...............',
+'........TTtTTTTtTN................',
+'.........TTTTTTTTN................',
+'..........PPPPPPN.................',
+'.........KPPPPPKN.................',
+'.........KPPKPPN..................',
+'.........KPP.KPN..................',
+'.........KPP.KPPN.................',
+'.........KPP.KPPN.................',
+'.........KPP.KPPN.................',
+'.........KPP.KPPPN................',
+'.........KPP.KPPPN................',
+'.........KPP.KPPPN................',
+'........WKPP.KPPKWN...............',
+'........WWWK.KWWWK.N..............',
+'...................NN.............',
+'....................NN............',
+'.....................NN...........',
+'......................NN..........',
+'.......................NDD........',
+'.......................NDDD.......',
+'........................DDD.......',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................'],
+back:[
+'.............................DD...',
+'............................DDDN..',
+'.............................NN...',
+'..............................NN..',
+'...........WWWWWW.............NN.',
+'..........WWWWWWWW.............NN',
+'..........WwwwwwwW.............N.',
+'.........HSSSSSSSSWW..........WN.',
+'.........HSSSSSSSS...........WW..',
+'..........SSssSS............WS...',
+'...........SSSSS...........SS....',
+'............SSS..........SS......',
+'...........TTTTT........SS.......',
+'..........TTTTTTT......SS........',
+'.........TTTTTTTTT....SS.........',
+'........TTTTTTTTTTT...S..........',
+'........TTtTTTTtTT...............',
+'.......TTTTTTTTTTT...............',
+'.......TTTTTTTTTTT...............',
+'........TTTTTTTTTT...............',
+'........TTtTTTTtT................',
+'.........TTTTTTT.................',
+'.........TTTTTT..................',
+'..........PPPPP..................',
+'.........KPPPPPK.................',
+'.........KPPKPPK.................',
+'.........KPP.KPK.................',
+'.........KPP.KPPK................',
+'.........KPP.KPPK................',
+'.........KPP.KPPK................',
+'.........KPP.KPPK................',
+'.........KPP.KPPK................',
+'.........KPP.KPPK................',
+'........WKPP.KPPKW...............',
+'........WWWK.KWWWK...............',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................'],
+top:[
+'..............................DD..',
+'...................WWWWW......DDN.',
+'...................WWWWNNNNNNNNN..',
+'...................WWWN..........',
+'...........WWWWWW...W............',
+'..........WWWWWWWW...............',
+'..........WwwwwwwW...............',
+'.........HSSSSSSSSWW.............',
+'.........HSSSSSSSS...............',
+'..........SSssSS.................',
+'...........SSSSS..................',
+'............SSS...................',
+'...........TTTTT..................',
+'..........TTTTTTT.................',
+'.........TTTTTTTTT................',
+'........TTTTTTTTTTT...............',
+'.......TTTTTTTTTTTTT..............',
+'.......TTtTTTTtTTTS...............',
+'......SSTTTTTTTTTSS...............',
+'......SsTTTTTTTTTs................',
+'......SsTTTTTTTTTs................',
+'.......sTTTTTTTTs.................',
+'........TTTTTTTT..................',
+'........TTtTTtTT..................',
+'.........TTTTTT...................',
+'..........PPPPP...................',
+'.........KPPPPPK..................',
+'.........KPPKPPK..................',
+'.........KPP.KPK..................',
+'.........KPP.KPPK.................',
+'.........KPP.KPPK.................',
+'.........KPP.KPPK.................',
+'.........KPP.KPPK.................',
+'........WKPP.KPPKW................',
+'........WWWK.KWWWK................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................'],
+down:[
+'..................................',
+'..................................',
+'...........WWWWWW.................',
+'..........WWWWWWWW................',
+'..........WwwwwwwW................',
+'.........HSSSSSSSSWW..............',
+'.........HSSSSSSSS................',
+'..........SSssSS..................',
+'...........SSSSS..................',
+'............SSS...................',
+'...........TTTTT..................',
+'..........TTTTTTT.................',
+'.........TTTTTTTTT................',
+'........TTTTTTTTTTTSS.............',
+'........TTtTTTTtTT.SS.............',
+'.......TTTTTTTTTTTT.SS............',
+'.......TTTTTTTTTTTWWSS............',
+'.......TTTTTTTTTTTWWN.............',
+'........TTTTTTTTTTWN..............',
+'........TTtTTTTtTN................',
+'.........TTTTTTTTN................',
+'.........TTTTTTTN.................',
+'..........PPPPPPN.................',
+'.........KPPPPPKN.................',
+'.........KPPKPPKN.................',
+'.........KPP.KPPN.................',
+'.........KPP.KPPPN................',
+'.........KPP.KPPPN................',
+'.........KPP.KPPPN................',
+'.........KPP.KPPPN................',
+'.........KPP.KPPPN................',
+'.........KPP.KPPPN................',
+'.........KPP.KPPPN................',
+'........WKPP.KPPKW.N..............',
+'........WWWK.KWWWK.NN.............',
+'....................NN............',
+'.....................NN...........',
+'......................NN..........',
+'.......................NN.........',
+'........................NDD.......',
+'........................NDDD......',
+'.........................DDD......',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................'],
+follow:[
+'.............................DD...',
+'............................DDDNN.',
+'.............................NN...',
+'...........WWWWWW.............N..',
+'..........WWWWWWWW...........WN..',
+'..........WwwwwwwW..........WW...',
+'.........HSSSSSSSSWW........WS...',
+'.........HSSSSSSSS.........SS....',
+'..........SSssSS..........SS.....',
+'...........SSSSSS.........S......',
+'............SSSTTT...............',
+'............TTTTTT...............',
+'...........TTTTTTTT..............',
+'..........TTTTTTTTTT.............',
+'.........TTTTTTTTTTTT............',
+'.........TTtTTTTtTTTT............',
+'........TTTTTTTTTTTTT............',
+'........TTTTTTTTTTTT.............',
+'.........TTTTTTTTTT..............',
+'.........TTtTTTTtT...............',
+'..........TTTTTTT................',
+'..........TTTTTT.................',
+'...........PPPPP.................',
+'..........KPPPPPK................',
+'..........KPKPPPK................',
+'.........KPP.KPPPK...............',
+'.........KPP..KPPK...............',
+'.........KP...KPPK...............',
+'.........KP...KPPK...............',
+'.........KP...KPPK...............',
+'.........KP...KPPK...............',
+'........WKP...KPPKW..............',
+'........WWK...KWWWK..............',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................'],
+putt:[
+'..................................',
+'..................................',
+'..................................',
+'...........WWWWWW.................',
+'..........WWWWWWWW................',
+'..........WwwwwwwW................',
+'.........HSSSSSSSSWW..............',
+'.........HSSSSSSSS................',
+'..........SSssSS..................',
+'...........SSSSS..................',
+'............SSS...................',
+'...........TTTTT..................',
+'..........TTTTTTT.................',
+'.........TTTTTTTTT................',
+'........TTTTTTTTTTT...............',
+'........TTTTTTTTTTT...............',
+'.......SSTTTTTTTTTSS..............',
+'.......SsTTTTTTTTTsS..............',
+'.......SsTTTTTTTTWW...............',
+'........sTTTTTTTTWWN..............',
+'.........TTTTTTTTWN...............',
+'.........TTTTTTTTN................',
+'..........TTTTTTN.................',
+'..........PPPPPN..................',
+'.........KPPPPPN..................',
+'.........KPPKPPN..................',
+'.........KPPKPPN..................',
+'.........KPPKPPN..................',
+'.........KPPKPPN..................',
+'.........KPPKPPN..................',
+'.........KPPKPPN..................',
+'.........KPPKPPN..................',
+'.........KPPKPPN..................',
+'........WKPPKPPKWN................',
+'........WWWKPPWWWN................',
+'.................N................',
+'.................N................',
+'.................ND...............',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................'],
+puttHit:[
+'..................................',
+'..................................',
+'..................................',
+'...........WWWWWW.................',
+'..........WWWWWWWW................',
+'..........WwwwwwwW................',
+'.........HSSSSSSSSWW..............',
+'.........HSSSSSSSS................',
+'..........SSssSS..................',
+'...........SSSSS..................',
+'............SSS...................',
+'...........TTTTT..................',
+'..........TTTTTTT.................',
+'.........TTTTTTTTT................',
+'........TTTTTTTTTTT...............',
+'........TTTTTTTTTTTSS.............',
+'.......SSTTTTTTTTTTS..............',
+'.......SsTTTTTTTTTWW..............',
+'.......SsTTTTTTTTWWN..............',
+'........sTTTTTTTTWW.N.............',
+'.........TTTTTTTTW..N.............',
+'.........TTTTTTTT...N.............',
+'..........TTTTTT....N.............',
+'..........PPPPP.....N.............',
+'.........KPPPPPK....N.............',
+'.........KPPKPPK....N.............',
+'.........KPPKPPK....N.............',
+'.........KPPKPPK....N.............',
+'.........KPPKPPK....N.............',
+'.........KPPKPPK....N.............',
+'.........KPPKPPK....N.............',
+'.........KPPKPPK....N.............',
+'.........KPPKPPK....ND............',
+'........WKPPKPPKW.................',
+'........WWWKPPWWW.................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................',
+'..................................']};
+function framePal(g){
+  return {K:'#141414',W:'#f4f4f4',w:'#b9c4c9',S:g.skin,s:g.sd||'#b57e52',H:g.hair,
+    T:g.shirt,t:g.dark,P:g.pants,N:'#9aa2ab',D:'#3a4046',G:'#4a443c'};
+}
+// ---------- 7b. golfista → frames en el billboard ----------
 const gCan=golferCanvas,gx2=gCan.getContext('2d');
 function drawGolfSprite(){
-  const g=golfer(),sp=SPR[G.gi],PX=2;
-  gx2.clearRect(0,0,72,72);
+  const g=golfer(),pal=framePal(g);
+  const onGreen=lieAt(G.ball.x,G.ball.y)==='green';
+  const st=G.swing.stage;
+  let fr;
+  if(st==='pdown')fr='puttHit';
+  else if(st==='down')fr='down';
+  else if(st==='top')fr='top';
+  else if(st==='back')fr=(G.meter&&G.meter.p>0.45)?'back':'addr';
+  else if(st==='follow')fr='follow';
+  else fr=onGreen?'putt':'addr';
+  const map=FRAMES[fr];
+  gx2.clearRect(0,0,34,48);
   gx2.imageSmoothingEnabled=false;
-  const follow=G.swing.stage==='follow';
-  const putt=lieAt(G.ball.x,G.ball.y)==='green'||G.swing.stage==='pdown';
-  const legs=follow?sp.legsF:sp.legsA, T=follow?sp.up:sp.bent;
-  const fx=22,fy=70-10*PX;
-  gx2.drawImage(legs,fx,fy,12*PX,10*PX);
-  const tx=fx-1*PX,ty=fy-T.height*PX+2*PX;
-  gx2.drawImage(T,tx,ty,T.width*PX,T.height*PX);
-  gx2.drawImage(sp.head,tx+8*PX-5*PX,ty-9*PX+2*PX,10*PX,10*PX);
-  const clubA=swingClubA()*Math.PI/180;
-  const shx=tx+7*PX,shy=ty+5*PX,Lp=(putt?13:22)*PX;
-  const tipX=shx+Math.sin(clubA)*Lp,tipY=shy+Math.cos(clubA)*Lp;
-  gx2.strokeStyle=g.skin;gx2.lineWidth=2.4*PX;gx2.lineCap='round';
-  gx2.beginPath();gx2.moveTo(shx-2*PX,shy);
-  gx2.lineTo(shx+Math.sin(clubA)*Lp*0.55,shy+Math.cos(clubA)*Lp*0.55);gx2.stroke();
-  gx2.fillStyle='#f4f4f4';
-  gx2.fillRect(shx+Math.sin(clubA)*Lp*0.55-1.6*PX,shy+Math.cos(clubA)*Lp*0.55-1.6*PX,3.2*PX,3.2*PX);
-  gx2.strokeStyle='#9a8b7a';gx2.lineWidth=1.4*PX;
-  gx2.beginPath();gx2.moveTo(shx,shy);gx2.lineTo(tipX,tipY);gx2.stroke();
-  gx2.fillStyle=putt?'#cfd8dc':'#5d6b7a';
-  gx2.fillRect(tipX-2*PX,tipY-1*PX,4*PX,2.4*PX);
+  gx2.save();gx2.translate(34,0);gx2.scale(-1,1); // espejar: bola a la izquierda
+  for(let y=0;y<map.length&&y<48;y++){
+    const row=map[y];
+    for(let x=0;x<row.length&&x<34;x++){
+      const c=pal[row[x]];
+      if(!c)continue;
+      gx2.fillStyle=c;gx2.fillRect(x,y,1,1);
+    }
+  }
+  gx2.restore();
   golferTex.needsUpdate=true;
 }
 function golfKey(){
@@ -679,7 +1056,7 @@ function syncScene(dt){
   }else trailLine.visible=false;
   // golfista billboard junto a la bola
   const d=aimDir3();
-  golferSprite.position.set(bp.x-d.z*1.7,1.7,bp.z+d.x*1.7);
+  golferSprite.position.set(bp.x-d.z*1.7,0.7,bp.z+d.x*1.7);
   golferSprite.visible=!G.flight&&!G.holed;
   const k=golfKey();
   if(k!==lastGolfKey||G.swing.stage!=='idle'){drawGolfSprite();lastGolfKey=k;}
