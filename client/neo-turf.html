@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
 <style>
   *{box-sizing:border-box} body{margin:0;background:#06130b;color:#fff;font-family:'Press Start 2P',monospace}
-  #top{display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;background:#0d2b16;border-bottom:3px solid #ffd23f;flex-wrap:wrap;font-size:10px}
+  #top{display:none;gap:8px;align-items:center;justify-content:center;padding:8px;background:#0d2b16;border-bottom:3px solid #ffd23f;flex-wrap:wrap;font-size:10px}
   .tag{background:#123c1f;border:2px solid #ffd23f;border-radius:6px;padding:6px 8px}
   #hudMsg{color:#ffeb3b}
   #windArrow{display:inline-block}
@@ -290,11 +290,22 @@ function stepFlight(dt){
     f.vy+=f.curve*h*0.55;
     f.x+=(f.vx+f.wx)*h;f.y+=(f.vy+f.wy)*h;
     f.vh-=30*h;f.h+=f.vh*h;
-    if(f.h<=0){f.h=0;land();return;}
+    if(f.h<=0){f.h=0;if(!bounceOrLand(f))return;}
   }
   f.trail.push({x:f.x,y:f.y,h:f.h});
   if(f.trail.length>70)f.trail.shift();
   G.ball.x=f.x;G.ball.y=f.y;G.ball.h=f.h;
+}
+function bounceOrLand(f){
+  const nb=(f.bounces||0),impactV=Math.abs(f.vh),lie=lieAt(f.x,f.y);
+  const bad=lie==='water'||lie==='cliff'||f.x<-60||f.x>hole().pin.x+160||Math.abs(f.y)>240;
+  if(!bad&&nb<2&&impactV>26){
+    f.bounces=nb+1;f.vh=impactV*(lie==='green'?0.22:0.32);
+    f.vx*=0.82;f.vy*=0.82;f.h=0.5;
+    snd('bounce');
+    return true;
+  }
+  land();return false;
 }
 function land(){
   const f=G.flight;G.flight=null;
@@ -1105,8 +1116,10 @@ function drawOverlay(){
   if(G.screen==='select'){drawSelect();return;}
   if(G.screen==='intro'){drawIntro();return;}
   drawPinLabel();
+  drawTopInfo();
   drawMinimap();
   drawGauge();
+  drawStatusBar();
   drawBanner();
   if(G.fade>0){ctx.fillStyle='rgba(0,0,0,'+Math.min(1,G.fade*1.4)+')';ctx.fillRect(0,0,W,H);G.fade-=0.06;}
 }
@@ -1154,11 +1167,22 @@ function drawMinimap(){
     ctx.stroke();
   }
   ctx.setLineDash([]);
+  // viento estilo arcade (m/s + flecha) bajo el mapa
+  const wbx=mx,wby=my+mh+24;
+  ctx.fillStyle='#000c';ctx.fillRect(wbx-5,wby,mw+10,34);
+  ctx.strokeStyle='#ffd23f';ctx.strokeRect(wbx-5,wby,mw+10,34);
+  ctx.fillStyle='#fff';ctx.font='8px "Press Start 2P",monospace';ctx.textAlign='left';
+  ctx.fillText('WIND',wbx+6,wby+14);
+  ctx.save();ctx.translate(wbx+72,wby+17);ctx.rotate(-G.wind.ang);
+  ctx.fillStyle='#40c4ff';ctx.font='14px monospace';ctx.textAlign='center';ctx.fillText('➤',0,5);ctx.restore();
+  ctx.fillStyle='#ffeb3b';ctx.font='10px "Press Start 2P",monospace';ctx.textAlign='right';
+  ctx.fillText((G.wind.mph*0.447).toFixed(0)+' m/s',wbx+mw,wby+21);
+  ctx.textAlign='left';
   ctx.fillStyle='#ffd23f';ctx.font='8px "Press Start 2P",monospace';ctx.fillText('MAP',mx,my+mh+14);
 }
 function drawGauge(){
   if(G.screen!=='play')return;
-  const gx=W-64,gw=34,gy=150,gh=H-150-118,F='8px "Press Start 2P",monospace';
+  const gx=W-64,gw=34,gy=190,gh=H-190-118,F='8px "Press Start 2P",monospace';
   ctx.fillStyle='#000c';ctx.fillRect(gx-34,gy-44,gw+42,gh+96);
   ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.strokeRect(gx-34,gy-44,gw+42,gh+96);ctx.lineWidth=1;
   ctx.fillStyle='#ffd23f';ctx.font=F;ctx.textAlign='center';
@@ -1194,22 +1218,62 @@ function drawGauge(){
     ctx.fillText(lie.toUpperCase(),gx-28,gy+gh+14);
   }
   if(G.meter&&G.meter.phase==='power'){ctx.fillStyle='#fff';ctx.font=F;ctx.fillText((G.meter.p*100).toFixed(0)+'%',gx-12,gy+gh+16);}
-  ctx.font='8px "Press Start 2P",monospace';
-  let hint='';
-  if(G.holed)hint='ESPACIO: SIGUIENTE';
-  else if(G.flight)hint='...';
-  else if(!G.meter)hint='ESPACIO: SWING Z:X HOOK C:RECTO';
-  else if(G.meter.phase==='power')hint='FIJA POTENCIA!';
-  else hint='CLAVA EL BLANCO!';
-  ctx.fillStyle='#000a';ctx.fillRect(10,H-28,ctx.measureText(hint).width+14,20);
-  ctx.fillStyle='#ffeb3b';ctx.fillText(hint,17,H-14);
+  // etiquetas LOW/NICE/HIGH + cursor con la cabeza del golfista
+  ctx.font='7px "Press Start 2P",monospace';ctx.textAlign='left';
+  if(G.meter&&G.meter.phase==='height'){
+    ctx.fillStyle='#ff8a80';ctx.fillText('HIGH',gx+gw+4,gy+12);
+    ctx.fillStyle='#fff';ctx.fillText('NICE',gx+gw+4,gy+gh/2+3);
+    ctx.fillStyle='#ff8a80';ctx.fillText('LOW',gx+gw+4,gy+gh-8);
+  }
+  if(G.meter){
+    const cap=powerCap();
+    const cy=gy+gh-(Math.min(G.meter.p,cap)/cap)*gh;
+    ctx.drawImage(SPR[G.gi].head,gx-17,cy-7,14,14);
+  }
+  ctx.textAlign='left';
+}
+function drawTopInfo(){
+  if(G.screen!=='play')return;
+  const d=distToPin(G.ball.x,G.ball.y);
+  ctx.textAlign='left';
+  ctx.fillStyle='#fff';ctx.font='8px "Press Start 2P",monospace';
+  ctx.fillText('1 PLAYER · STROKE PLAY',12,24);
+  ctx.fillStyle='#ffeb3b';ctx.font='12px "Press Start 2P",monospace';
+  ctx.fillText('REST '+d.toFixed(0)+'Y',12,44);
+  ctx.textAlign='left';
+}
+function drawStatusBar(){
+  if(G.screen!=='play')return;
+  const y0=H-30,F='8px "Press Start 2P",monospace';
+  ctx.fillStyle='#0d2b16';ctx.fillRect(0,y0,W,30);
+  ctx.fillStyle='#ffd23f';ctx.fillRect(0,y0,W,2);
+  ctx.font=F;ctx.textAlign='left';
+  const stance=G.curve<0?'◄HOOK':G.curve>0?'SLICE►':'RECTO';
+  const club=CLUBS[G.clubIndex];
+  ctx.fillStyle='#888';ctx.fillText('STANCE',10,y0+12);
+  ctx.fillStyle='#fff';ctx.fillText(stance,10,y0+24);
+  ctx.fillStyle='#888';ctx.fillText('CLUB',110,y0+12);
+  ctx.fillStyle='#fff';ctx.fillText(club.id+'·'+(club.max*driveScale()).toFixed(0)+'Y',110,y0+24);
+  ctx.fillStyle='#888';ctx.fillText('SHOT',250,y0+12);
+  ctx.fillStyle='#ffeb3b';
+  let shot='···';
+  if(G.meter)shot=G.meter.phase==='power'?'POWER '+(G.meter.p*100).toFixed(0)+'%':'HEIGHT!';
+  else if(G.flight||G.roll||G.putt)shot=G.shotMsg||'···';
+  else shot=G.holed?'ESPACIO: SIGUIENTE':'ESPACIO: SWING';
+  ctx.fillText(shot.slice(0,34),250,y0+24);
+  const h=hole(),names=['1st','2nd','3rd'];
+  ctx.fillStyle='#888';ctx.fillText('HOLE',590,y0+12);
+  ctx.fillStyle='#fff';
+  ctx.fillText((names[G.holeIndex]||(G.holeIndex+1)+'th')+' PAR '+h.par+' · '+G.stroke+' ST',590,y0+24);
+  ctx.fillStyle='#888';ctx.fillText('CREDIT 00',850,y0+24);
+  ctx.textAlign='left';
 }
 function drawBanner(){
   if(!G.banner)return;
   ctx.globalAlpha=Math.min(1,G.banner.t*2);
   ctx.fillStyle='#000d';ctx.fillRect(0,H/2-46,W,76);
   ctx.strokeStyle='#ffd23f';ctx.lineWidth=3;ctx.strokeRect(10,H/2-46,W-20,76);ctx.lineWidth=1;
-  ctx.fillStyle='#ffd23f';ctx.font='28px "Press Start 2P",monospace';ctx.textAlign='center';
+  ctx.fillStyle='#ffd23f';ctx.font='italic bold 30px Georgia,serif';ctx.textAlign='center';
   ctx.strokeStyle='#000';ctx.lineWidth=5;ctx.strokeText(G.banner.txt,W/2,H/2+8);
   ctx.fillText(G.banner.txt,W/2,H/2+8);
   ctx.textAlign='left';ctx.globalAlpha=1;ctx.lineWidth=1;
@@ -1334,7 +1398,7 @@ c2d.addEventListener('mousemove',e=>{
   if(G.screen!=='play'||G.meter||G.flight)return;
   G.aim+=e.movementX*0.0035;
 });
-function setMsg(m){document.getElementById('hudMsg').textContent=m;}
+function setMsg(m){document.getElementById('hudMsg').textContent=m;G.shotMsg=m;}
 function updateHUD(){
   const h=hole(),g=golfer(),club=CLUBS[G.clubIndex];
   const names=['1st','2nd','3rd'];
@@ -1362,6 +1426,7 @@ function snd(kind){
   else if(kind==='nice'){tone(660,0.1);tone(880,0.1,0.1);tone(1320,0.2,0.2);}
   else if(kind==='miss'){tone(140,0.25);}
   else if(kind==='putt'){tone(330,0.07);}
+  else if(kind==='bounce'){tone(520,0.05);}
   else if(kind==='hole'){tone(523,0.12);tone(659,0.12,0.12);tone(784,0.12,0.24);tone(1046,0.3,0.36);}
 }
 
