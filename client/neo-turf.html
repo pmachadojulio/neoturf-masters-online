@@ -396,7 +396,7 @@ sun.position.set(60,110,40);scene.add(sun);
   gx.fillStyle='#2f8f3e';gx.fillRect(0,0,128,128);
   gx.fillStyle='#2a8238';
   for(let r=0;r<64;r++)for(let q=0;q<64;q++)if((r+q)%2===0)gx.fillRect(q*2,r*2,2,2);
-  for(let i=0;i<500;i++){gx.fillStyle=Math.random()<0.5?'#256b32':'#3aa34c';gx.fillRect(Math.random()*128|0,Math.random()*128|0,2,1);}
+  for(let i=0;i<1500;i++){gx.fillStyle=['#256b32','#3aa34c','#1f5c2a'][i%3];gx.fillRect(Math.random()*128|0,Math.random()*128|0,2,1);}
   const gt=new THREE.CanvasTexture(gc);
   gt.wrapS=gt.wrapT=THREE.RepeatWrapping;gt.repeat.set(10,16);gt.magFilter=THREE.NearestFilter;
   const ground=new THREE.Mesh(new THREE.PlaneGeometry(360,700),
@@ -416,21 +416,31 @@ sun.position.set(60,110,40);scene.add(sun);
   });
   scene.add(mg);
   cloudGroup=new THREE.Group();
-  const cmat=new THREE.MeshLambertMaterial({color:0xffffff,flatShading:true});
-  for(let i=0;i<7;i++){
-    const cl=new THREE.Group();
-    for(let k=0;k<3;k++){
-      const s=new THREE.Mesh(new THREE.SphereGeometry(6+Math.random()*5,7,6),cmat);
-      s.scale.y=0.45;s.position.set(k*9-9,Math.random()*2,Math.random()*4);cl.add(s);
-    }
-    cl.position.set(-220+Math.random()*440,62+Math.random()*30,-420-Math.random()*150);
-    cloudGroup.add(cl);
+  // nubes pixel estilo arcade (sprite plano con panza sombreada)
+  const cloudCnv=document.createElement('canvas');cloudCnv.width=64;cloudCnv.height=24;
+  {
+    const x=cloudCnv.getContext('2d');
+    x.clearRect(0,0,64,24);
+    x.fillStyle='#ffffff';
+    x.fillRect(8,12,48,8);x.fillRect(16,6,24,8);x.fillRect(40,8,14,7);
+    x.fillRect(4,14,6,5);x.fillRect(54,14,6,5);
+    x.fillStyle='#c9ddf2';
+    x.fillRect(8,17,48,3);x.fillRect(16,19,24,2);
+  }
+  const cloudTex=new THREE.CanvasTexture(cloudCnv);cloudTex.magFilter=THREE.NearestFilter;
+  for(let i=0;i<8;i++){
+    const m=new THREE.SpriteMaterial({map:cloudTex,transparent:true,fog:false,depthWrite:false});
+    const sp=new THREE.Sprite(m);
+    const w=34+Math.random()*30;
+    sp.scale.set(w,w*0.375,1);
+    sp.position.set(-230+Math.random()*460,58+Math.random()*34,-400-Math.random()*160);
+    cloudGroup.add(sp);
   }
   scene.add(cloudGroup);
 }
 // bola + sombra + estela
-ballMesh=new THREE.Mesh(new THREE.SphereGeometry(0.42,14,10),
-  new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,emissive:0x666666}));
+ballMesh=new THREE.Mesh(new THREE.SphereGeometry(0.5,14,10),
+  new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,emissive:0x777777}));
 scene.add(ballMesh);
 shadowMesh=new THREE.Mesh(new THREE.CircleGeometry(0.5,16),
   new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.35,depthWrite:false}));
@@ -571,13 +581,14 @@ function buildCourse(){
     const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.5*s,0.7*s,3*s,6),t.t==='palm'?palmM:trunkM);
     trunk.position.y=1.5*s;g.add(trunk);
     if(t.t==='pine'){
-      for(let i=0;i<3;i++){
-        const cone=new THREE.Mesh(new THREE.ConeGeometry((4.4-i*1.1)*s,3.4*s,7),i%2?pineM2:pineM);
-        cone.position.y=(3.4+i*2.2)*s;g.add(cone);
+      for(let i=0;i<4;i++){
+        const cone=new THREE.Mesh(new THREE.ConeGeometry((5.2-i*1.0)*s,3.2*s,8),i%2?pineM2:(i===0?trunkM:pineM));
+        cone.position.y=(2.6+i*2.1)*s;g.add(cone);
       }
     }else if(t.t==='oak'){
-      const b1=new THREE.Mesh(new THREE.IcosahedronGeometry(3.4*s,0),oakM);b1.position.y=5.4*s;g.add(b1);
-      const b2=new THREE.Mesh(new THREE.IcosahedronGeometry(2.2*s,0),pineM2);b2.position.set(1.8*s,4.2*s,1*s);g.add(b2);
+      const b1=new THREE.Mesh(new THREE.IcosahedronGeometry(3.8*s,0),oakM);b1.position.y=5.6*s;g.add(b1);
+      const b2=new THREE.Mesh(new THREE.IcosahedronGeometry(2.5*s,0),pineM2);b2.position.set(2.2*s,4.4*s,1.2*s);g.add(b2);
+      const b3=new THREE.Mesh(new THREE.IcosahedronGeometry(2.1*s,0),trunkM);b3.position.set(-2.1*s,4.1*s,-1*s);g.add(b3);
     }else{
       trunk.rotation.z=0.18;trunk.position.x=0.5*s;
       for(let i=0;i<5;i++){
@@ -637,6 +648,13 @@ function buildCourse(){
     const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;
     const b=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.5,0.25),new THREE.MeshLambertMaterial({map:t}));
     b.position.set(h.tee.y-13,1.0,-h.tee.x+4);courseGroup.add(b);
+    // marcadores del tee (blanco + azul)
+    for(const s of [-1,1]){
+      const mk=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.55,0.55),
+        new THREE.MeshLambertMaterial({color:s<0?0xf4f4f4:0x1e88e5}));
+      const mp=V3(h.tee.x,h.tee.y+s*3.2,0);
+      mk.position.set(mp.x,0.28,mp.z);courseGroup.add(mk);
+    }
   }
   // flechas de slope (sprites flotantes sobre el green)
   {
