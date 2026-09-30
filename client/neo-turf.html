@@ -166,6 +166,7 @@ const heightSweet=()=>0.09+golfer().skl*0.028;
 const redZone=lie=>Math.max(0.01,(lie==='shore'?0.42:lie==='sand'?0.30:lie==='rough'?0.17:lie==='fringe'?0.08:0.055)-golfer().rec*0.028);
 const driveScale=()=>0.86+golfer().drv*0.04;
 const powerCap=()=>golfer().drv>=5?1.14:golfer().drv>=4?1.06:1.0;
+const LIEPOW={tee:1,fairway:1,green:1,fringe:0.92,rough:0.8,sand:0.65,shore:0.45};
 
 // ---------- 4. TERRENO (lógica) ----------
 const d2=(ax,ay,bx,by)=>Math.hypot(bx-ax,by-ay);
@@ -196,7 +197,9 @@ function distToPin(x,y){const h=hole();return d2(x,y,h.pin.x,h.pin.y);}
 function autoClub(){
   const d=distToPin(G.ball.x,G.ball.y);
   if(onGreen(G.ball.x,G.ball.y))return 7;
-  for(const i of [0,1,2,3,4,5])if(d<=CLUBS[i].max*driveScale()*1.02)return i;
+  const lie=lieAt(G.ball.x,G.ball.y);
+  const eff=d/Math.max(0.4,LIEPOW[lie]||1); // del rough/sand pide más palo
+  for(const i of [5,4,3,2,1,0])if(eff<=CLUBS[i].max*driveScale()*1.02)return i;
   return 0;
 }
 
@@ -247,7 +250,7 @@ function doShot(ps){
   const errLat=(off-sw>0?(off-sw):0)*46*(6-g.acc)*0.35*((lie==='fairway'||lie==='tee')?1:1.8);
   const errDir=(ps.hPos>0.5?1:-1);
   const effMax=club.max*driveScale();
-  const liePow={tee:1,fairway:1,green:1,fringe:0.92,rough:0.8,sand:0.65,shore:0.45}[lie]||1;
+  const liePow=LIEPOW[lie]||1;
   const R=Math.min(effMax*1.12,Math.max(4,effMax*ps.power*hFactor*liePow*(perfect?1.02:1-(off*0.25))));
   const th=club.loft*Math.PI/180,gv=30;
   const v0=Math.sqrt(Math.max(1,R*gv/Math.max(0.12,Math.sin(2*th))));
