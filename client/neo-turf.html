@@ -243,7 +243,7 @@ function doShot(ps){
   const sw=heightSweet(),rz=redZone(lie);
   if(ps.hPos<rz||ps.hPos>1-rz){G.stroke++;setMsg('MISS! (+1)');updateHUD();snd('miss');return;}
   const off=Math.abs(ps.hPos-0.5),perfect=off<sw;
-  const hFactor=1.12-(ps.hPos*0.45);
+  const hFactor=1.16-(ps.hPos*0.45);
   const errLat=(off-sw>0?(off-sw):0)*46*(6-g.acc)*0.35*((lie==='fairway'||lie==='tee')?1:1.8);
   const errDir=(ps.hPos>0.5?1:-1);
   const effMax=club.max*driveScale();
@@ -303,7 +303,7 @@ function land(){
   if(lie==='cliff'){G.stroke++;G.ball={x:G.lastSafe.x,y:G.lastSafe.y,h:0};G.fade=1;setMsg('¡Al barranco! +1');updateHUD();autoAimClub();return;}
   if(x<-60||x>hole().pin.x+160||Math.abs(y)>240){G.stroke++;G.ball={x:G.lastSafe.x,y:G.lastSafe.y,h:0};G.fade=1;setMsg('¡Fuera! +1');updateHUD();autoAimClub();return;}
   const keep=lie==='fairway'?0.2:lie==='green'?0.18:lie==='fringe'?0.15:lie==='tee'?0.1:lie==='rough'?0.03:0.0;
-  const sp=Math.hypot(f.vx,f.vy)*0.14*keep,a=Math.atan2(f.vy,f.vx);
+  const sp=Math.hypot(f.vx,f.vy)*0.5*keep,a=Math.atan2(f.vy,f.vx);
   G.roll={x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp};
   G.ball.h=0;
 }
@@ -481,9 +481,15 @@ function buildCourse(){
     m.rotation.x=-Math.PI/2;m.scale.set(rx,ry,1);m.position.set(wy,y,-wx);
     courseGroup.add(m);return m;
   };
-  // fringe + green
-  disc(h.pin.x,h.pin.y,h.green.rx*1.28,h.green.ry*1.32,0.008,lam('#8be08b'));
+  const ring=(wx,wy,rx,ry,y,mat)=>{
+    const m=new THREE.Mesh(new THREE.RingGeometry(0.93,1.0,40),mat);
+    m.rotation.x=-Math.PI/2;m.scale.set(rx,ry,1);m.position.set(wy,y,-wx);
+    courseGroup.add(m);return m;
+  };
+  // fringe + green (fringe 1.34x = lógica nd<1.8)
+  disc(h.pin.x,h.pin.y,h.green.rx*1.34,h.green.ry*1.36,0.008,lam('#8be08b'));
   disc(h.pin.x,h.pin.y,h.green.rx,h.green.ry,0.016,new THREE.MeshLambertMaterial({map:greenTex}));
+  ring(h.pin.x,h.pin.y,h.green.rx,h.green.ry,0.017,new THREE.MeshBasicMaterial({color:0x2f9e44}));
   // hoyo (copa)
   disc(h.pin.x,h.pin.y,0.9,0.9,0.024,new THREE.MeshBasicMaterial({color:0x0d0d0d}));
   // bunkers + agua
@@ -493,10 +499,21 @@ function buildCourse(){
     wm.map.needsUpdate=true;wm.map.wrapS=wm.map.wrapT=THREE.RepeatWrapping;
     waterMats.push(wm);
     disc(w.x,w.y,w.rx,w.ry,0.02,wm);
+    ring(w.x,w.y,w.rx*1.02,w.ry*1.02,0.021,new THREE.MeshBasicMaterial({color:0x1b6fa8}));
   }
   // orilla húmeda + acantilados + estacas de OB
   for(const w of h.water)disc(w.x,w.y,w.rx*1.35,w.ry*1.35,0.010,new THREE.MeshLambertMaterial({color:0xcbb26a}));
-  for(const c of (h.cliffs||[]))disc(c.x,c.y,c.rx,c.ry,0.006,new THREE.MeshLambertMaterial({map:rockTex}));
+  for(const c of (h.cliffs||[])){
+    disc(c.x,c.y,c.rx,c.ry,0.006,new THREE.MeshLambertMaterial({map:rockTex}));
+    ring(c.x,c.y,c.rx,c.ry,0.008,new THREE.MeshBasicMaterial({color:0x3d3227}));
+    for(let i=0;i<4;i++){
+      const a=c.x*3.1+c.y*1.7+i*2.4,rr=0.45+(((i*37+c.x)|0)%20)/20*0.35;
+      const p3=V3(c.x+Math.cos(a)*c.rx*rr*0.7,c.y+Math.sin(a*1.3)*c.ry*rr*0.7,0);
+      const rk=new THREE.Mesh(new THREE.IcosahedronGeometry(1.1+(i%3)*0.5,0),
+        new THREE.MeshLambertMaterial({color:0x7a6f63,flatShading:true}));
+      rk.position.set(p3.x,0.7,p3.z);courseGroup.add(rk);
+    }
+  }
   {
     const obM=new THREE.MeshBasicMaterial({color:0xf4f4f4});
     const yEdge=h.fairwayW/2+55;
@@ -507,6 +524,15 @@ function buildCourse(){
         post.position.set(c.y+s*yEdge,0.9,-wx);
         courseGroup.add(post);
       }
+    }
+    for(const s of [-1,1]){
+      const pts=[];
+      for(let wx=h.tee.x-10;wx<=h.pin.x+30;wx+=15){
+        const c=fairwayCenterAt(wx);
+        pts.push(new THREE.Vector3(c.y+s*yEdge,1.5,-wx));
+      }
+      courseGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({color:0xf4f4f4})));
     }
   }
   // árboles low-poly
@@ -874,7 +900,7 @@ function drawIntro(){
   ctx.fillStyle='#2f9fd8';for(const w of h.water){ctx.beginPath();ctx.ellipse(X(w.x),Y(w.y),w.rx/(x1-x0)*mw,w.ry/(y1-y0)*mh,0,0,7);ctx.fill();}
   ctx.fillStyle='#ecd88f';for(const b of h.bunkers){ctx.beginPath();ctx.ellipse(X(b.x),Y(b.y),b.rx/(x1-x0)*mw,b.ry/(y1-y0)*mh,0,0,7);ctx.fill();}
   ctx.fillStyle='#14521f';for(const t of h.trees){ctx.beginPath();ctx.arc(X(t.x),Y(t.y),5,0,7);ctx.fill();}
-  ctx.fillStyle='#8be08b';ctx.beginPath();ctx.ellipse(X(h.pin.x),Y(h.pin.y),(h.green.rx*1.25)/(x1-x0)*mw,(h.green.ry*1.3)/(y1-y0)*mh,0,0,7);ctx.fill();
+  ctx.fillStyle='#8be08b';ctx.beginPath();ctx.ellipse(X(h.pin.x),Y(h.pin.y),(h.green.rx*1.34)/(x1-x0)*mw,(h.green.ry*1.36)/(y1-y0)*mh,0,0,7);ctx.fill();
   ctx.fillStyle='#5fd46e';ctx.beginPath();ctx.ellipse(X(h.pin.x),Y(h.pin.y),h.green.rx/(x1-x0)*mw,h.green.ry/(y1-y0)*mh,0,0,7);ctx.fill();
   ctx.fillStyle='#fff';ctx.fillRect(X(h.tee.x)-3,Y(h.tee.y)-3,6,6);
   ctx.fillStyle='#f00';ctx.beginPath();ctx.arc(X(h.pin.x),Y(h.pin.y),5,0,7);ctx.fill();
