@@ -1367,7 +1367,7 @@ function drawSelect(){
     const sp=SPR[i],PS=4;
     ctx.imageSmoothingEnabled=false;
     ctx.fillStyle='#1d3b22';ctx.fillRect(52,y-40,10*PS,10*PS);
-    if(i===1&&darioImg.complete&&darioImg.naturalWidth)ctx.drawImage(darioImg,52,y-40,10*PS,10*PS);
+    if(i===1&&darioImg.complete&&darioImg.naturalWidth){ctx.fillStyle='#000';ctx.fillRect(52,y-40,10*PS,10*PS);ctx.drawImage(darioImg,57,y-40,30,40);}
     else ctx.drawImage(sp.head,52,y-40,10*PS,10*PS);
     ctx.fillStyle=gf.shirt;ctx.fillRect(52,y-40+10*PS,10*PS,3*PS);
     const fl=FLAGS[gf.ctry];
