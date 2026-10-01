@@ -50,7 +50,7 @@ import * as THREE from 'three';
 const GOLFERS = [
   {name:'GEORGE SPINNER', nick:'YOUNG HERO', ctry:'USA', drv:3, acc:3, skl:3, rec:3, put:3,
    shirt:'#7a8b3d', dark:'#5a6b2d', pants:'#3d3d3d', skin:'#f0c090', hair:'#5a3a1a', feat:'sidepart'},
-  {name:'THOMAS STEWART', nick:'TECHNICIAN', ctry:'UK', drv:2, acc:4, skl:5, rec:4, put:3,
+  {name:'DARIO MAGGI', nick:'TECHNICIAN', ctry:'ARG', drv:2, acc:4, skl:5, rec:4, put:3,
    shirt:'#3d6b8b', dark:'#2d4b63', pants:'#222', skin:'#f0c8a0', hair:'#d8b83d', feat:'glasses'},
   {name:'FRANK ADAMS', nick:'VETERAN', ctry:'AUS', drv:1, acc:2, skl:4, rec:5, put:2,
    shirt:'#6b5a3d', dark:'#4a3d2d', pants:'#2d2d2d', skin:'#d8a070', hair:'#4a2d1a', feat:'cap_stache'},
@@ -123,8 +123,9 @@ const FLAGS={
  AUS:['BBBKBBBBBBB','BBBBBKBBBBB','BBWBBBBBWBB','BBBBBBBBBBB','BBWBBBBBWBB','BBBBBKBBBBB','BBBKBBBBBBB','BBBBBBBBBBB','BBBBBBBBBBB'],
  GER:['KKKKKKKKKKKK','KKKKKKKKKKKK','KKKKKKKKKKKK','RRRRRRRRRRRR','RRRRRRRRRRRR','RRRRRRRRRRRR','YYYYYYYYYYYY','YYYYYYYYYYYY','YYYYYYYYYYYY'],
  BRA:['GGGGGGGGGGGG','GGGGGGYYGGGG','GGGGYYYYYYGG','GGGYYBBYYGGG','GGGGYYYYYYGG','GGGGGGYYGGGG','GGGGGGGGGGGG','GGGGGGGGGGGG','GGGGGGGGGGGG'],
- JPN:['WWWWWWWWWWWW','WWWWWWWWWWWW','WWWRRRRRWWW','WWRRRRRRRWW','WWRRRRRRRWW','WWRRRRRRRWW','WWWRRRRRWWW','WWWWWWWWWWWW','WWWWWWWWWWWW']};
-const FCOL={R:'#d83a3a',W:'#f4f4f4',B:'#2a4ad8',K:'#111',Y:'#ffd23f',G:'#2d9b4d'};
+  JPN:['WWWWWWWWWWWW','WWWWWWWWWWWW','WWWRRRRRWWW','WWRRRRRRRWW','WWRRRRRRRWW','WWRRRRRRRWW','WWWRRRRRWWW','WWWWWWWWWWWW','WWWWWWWWWWWW'],
+  ARG:['CCCCCCCCCCCC','CCCCCCCCCCCC','CCCCCCCCCCCC','WWWWWWWWWWWW','WWWWWWWWWWWW','WWWWWWWWWWWW','CCCCCCCCCCCC','CCCCCCCCCCCC','CCCCCCCCCCCC']};
+const FCOL={R:'#d83a3a',W:'#f4f4f4',B:'#2a4ad8',K:'#111',Y:'#ffd23f',G:'#2d9b4d',C:'#7cc4e8'};
 function palFor(g){
   return {K:'#101010',T:g.shirt,t:g.dark,P:g.pants,p:'rgba(0,0,0,0.35)',S:g.skin,s:'#c89868',
     H:g.hair,C:g.hair,E:'#101010',G:'#222',M:'#2d1a0d',V:'#f4f4f4',Y:'#ffd23f',W:'#f4f4f4'};
@@ -1351,9 +1352,9 @@ function drawBanner(){
   ctx.fillText(G.banner.txt,W/2,H/2+8);
   ctx.textAlign='left';ctx.globalAlpha=1;ctx.lineWidth=1;
 }
+const darioImg=new Image();darioImg.src='portraits/dario.png';
 function drawSelect(){
-  const g=ctx.createLinearGradient(0,0,0,H);
-  g.addColorStop(0,'#5a5a1e');g.addColorStop(1,'#2d2d10');
+  const g=ctx.createLinearGradient(0,0,0,H);  g.addColorStop(0,'#5a5a1e');g.addColorStop(1,'#2d2d10');
   ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
   ctx.fillStyle='#f4f4f4';ctx.font='italic bold 24px "Brush Script MT","Segoe Script",cursive';ctx.textAlign='center';
   ctx.fillText('Golfer Selection',W/2,34);
@@ -1366,7 +1367,8 @@ function drawSelect(){
     const sp=SPR[i],PS=4;
     ctx.imageSmoothingEnabled=false;
     ctx.fillStyle='#1d3b22';ctx.fillRect(52,y-40,10*PS,10*PS);
-    ctx.drawImage(sp.head,52,y-40,10*PS,10*PS);
+    if(i===1&&darioImg.complete&&darioImg.naturalWidth)ctx.drawImage(darioImg,52,y-40,10*PS,10*PS);
+    else ctx.drawImage(sp.head,52,y-40,10*PS,10*PS);
     ctx.fillStyle=gf.shirt;ctx.fillRect(52,y-40+10*PS,10*PS,3*PS);
     const fl=FLAGS[gf.ctry];
     for(let r=0;r<9;r++)for(let c=0;c<12;c++){ctx.fillStyle=FCOL[fl[r][c]];ctx.fillRect(52+10*PS+8+c*2,y-40+r*2,2,2);}
