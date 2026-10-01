@@ -64,10 +64,10 @@ const GOLFERS = [
 const CLUBS = [
   {id:'1W', name:'1 WOOD', max:270, loft:12},
   {id:'3W', name:'3 WOOD', max:240, loft:16},
-  {id:'5I', name:'5 IRON', max:200, loft:24},
+  {id:'4I', name:'4 IRON', max:200, loft:24},
   {id:'7I', name:'7 IRON', max:165, loft:32},
   {id:'9I', name:'9 IRON', max:135, loft:40},
-  {id:'PW', name:'WEDGE',  max:100, loft:52},
+  {id:'PW', name:'WEDGE',  max:130, loft:48},
   {id:'SW', name:'SAND WEDGE', max:75, loft:56},
   {id:'PT', name:'PUTTER', max:30,  loft:4},
 ];
@@ -1169,7 +1169,8 @@ function drawPinLabel(){
   const h=hole(),p=V3(h.pin.x,h.pin.y,7);
   const s=worldToScreen(p);
   if(s.behind)return;
-  const d=distToPin(G.ball.x,G.ball.y),label='PIN '+d.toFixed(0)+'y';
+  const d=distToPin(G.ball.x,G.ball.y),onG=onGreen(G.ball.x,G.ball.y);
+  const label=onG?'PIN '+(d*0.914).toFixed(1)+'m':'PIN '+d.toFixed(0)+'y';
   ctx.font='10px "Press Start 2P",monospace';
   const tw=ctx.measureText(label).width;
   ctx.fillStyle='#000c';ctx.fillRect(s.x-tw/2-5,s.y-20,tw+10,20);
@@ -1224,54 +1225,84 @@ function drawMinimap(){
 }
 function drawGauge(){
   if(G.screen!=='play')return;
-  const gx=W-64,gw=34,gy=190,gh=H-190-118,F='8px "Press Start 2P",monospace';
-  ctx.fillStyle='#000c';ctx.fillRect(gx-34,gy-44,gw+42,gh+96);
-  ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.strokeRect(gx-34,gy-44,gw+42,gh+96);ctx.lineWidth=1;
-  ctx.fillStyle='#ffd23f';ctx.font=F;ctx.textAlign='center';
-  ctx.fillText('POWER',gx+gw/2,gy-28);
-  ctx.fillStyle='#fff';ctx.fillText(CLUBS[G.clubIndex].id,gx+gw/2,gy-14);
-  ctx.textAlign='left';
-  ctx.fillStyle='#1a1a1a';ctx.fillRect(gx,gy,gw,gh);
-  const cap=powerCap(),segs=30;
+  // dial circular estilo arcade: bola al centro, arco de potencia, LOW/NICE/HIGH
+  const cx=W-132,cy=H-118,R=58,F='8px "Press Start 2P",monospace';
+  const cap=powerCap();
+  const ang=p=>-Math.PI/2-(1-Math.min(Math.max(p,0),cap)/cap)*Math.PI; // p=1 arriba
+  ctx.fillStyle='#000c';ctx.fillRect(cx-R-16,cy-R-34,R*2+86,R*2+84);
+  ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;
+  ctx.strokeRect(cx-R-16,cy-R-34,R*2+86,R*2+84);ctx.lineWidth=1;
+  // anillo base
+  ctx.strokeStyle='#222';ctx.lineWidth=12;
+  ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.stroke();
+  // valor a mostrar: potencia en marcha o fijada
+  const showP=G.meter?(G.meter.phase==='power'?G.meter.p:G.meter.power):0;
+  // arco de potencia en segmentos verde->amarillo->rojo
+  const segs=28;
   for(let i=0;i<segs;i++){
+    const f0=i/segs,f1=(i+1)/segs;
+    if(f1>showP/cap&&!(G.meter&&G.meter.phase==='height'&&f1<=G.meter.power/cap))continue;
+    const dim=!(G.meter&&G.meter.phase==='power')&&f1>showP/cap;
     const fm=(i+0.5)/segs;
-    ctx.fillStyle=fm>1?'#b388ff':fm>0.85?'#ff5252':fm>0.6?'#ffb300':'#00e676';
-    const y1=gy+gh-((i+1)/segs/cap)*gh,y0=gy+gh-(i/segs/cap)*gh;
-    const on=G.meter&&G.meter.phase==='power'?fm<=G.meter.p:(G.meter?fm<=G.meter.power:false);
-    if(on)ctx.fillRect(gx+3,y1+1,gw-6,Math.max(1,y0-y1-1));
+    ctx.strokeStyle=dim?'#333':fm>0.85?'#ff5252':fm>0.6?'#ffb300':'#00e676';
+    ctx.lineWidth=12;
+    ctx.beginPath();ctx.arc(cx,cy,R,ang(f0*cap),ang(Math.min(f1*cap,cap)),true);ctx.stroke();
   }
-  ctx.strokeStyle='#000';
-  for(let i=0;i<=segs;i++){const y=gy+gh-(i/segs/cap)*gh;ctx.beginPath();ctx.moveTo(gx,y);ctx.lineTo(gx+gw,y);ctx.stroke();}
-  ctx.strokeStyle='#fff';ctx.strokeRect(gx,gy,gw,gh);
-  const y100=gy+gh-(1/cap)*gh;
-  ctx.fillStyle='#fff';ctx.fillRect(gx-5,y100-1,gw+10,2);
-  if(lieAt(G.ball.x,G.ball.y)==='green'){
-    const gyp=gy+gh-(puttNeed()/cap)*gh;
-    ctx.fillStyle='#40c4ff';ctx.fillRect(gx-7,gyp-2,gw+14,4);
-  }
+  ctx.lineWidth=1;
+  // zonas rojas + dulce en fase height
   if(G.meter&&G.meter.phase==='height'){
-    const lie=G.meter.lie,rz=redZone(lie),sw=heightSweet();
-    ctx.fillStyle='#c62828';
-    ctx.fillRect(gx,gy,gw,rz*gh);ctx.fillRect(gx,gy+gh*(1-rz),gw,rz*gh);
-    ctx.fillStyle='#fff';ctx.fillRect(gx,gy+gh/2-sw*gh,gw,sw*gh*2);
-    const yp=gy+gh-G.meter.p*gh;
-    ctx.fillStyle='#00e5ff';ctx.fillRect(gx-6,yp-2,gw+12,5);
-    ctx.fillStyle='#fff';ctx.font='7px "Press Start 2P",monospace';
-    ctx.fillText(lie.toUpperCase(),gx-28,gy+gh+14);
+    const rz=redZone(G.meter.lie),sw=heightSweet();
+    ctx.strokeStyle='#c62828';ctx.lineWidth=12;
+    ctx.beginPath();ctx.arc(cx,cy,R,ang(0),ang(rz),true);ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,R,ang(1-rz),ang(1),true);ctx.stroke();
+    ctx.strokeStyle='#fff';
+    ctx.beginPath();ctx.arc(cx,cy,R,ang(0.5-sw),ang(0.5+sw),true);ctx.stroke();
+    ctx.lineWidth=1;
   }
-  if(G.meter&&G.meter.phase==='power'){ctx.fillStyle='#fff';ctx.font=F;ctx.fillText((G.meter.p*100).toFixed(0)+'%',gx-12,gy+gh+16);}
-  // etiquetas LOW/NICE/HIGH + cursor con la cabeza del golfista
-  ctx.font='7px "Press Start 2P",monospace';ctx.textAlign='left';
-  if(G.meter&&G.meter.phase==='height'){
-    ctx.fillStyle='#ff8a80';ctx.fillText('HIGH',gx+gw+4,gy+12);
-    ctx.fillStyle='#fff';ctx.fillText('NICE',gx+gw+4,gy+gh/2+3);
-    ctx.fillStyle='#ff8a80';ctx.fillText('LOW',gx+gw+4,gy+gh-8);
-  }
+  // bola al centro con hoyuelos
+  ctx.fillStyle='#0a0a0a';
+  ctx.beginPath();ctx.arc(cx,cy,17,0,Math.PI*2);ctx.fill();
+  const bg=ctx.createRadialGradient(cx-5,cy-6,2,cx,cy,17);
+  bg.addColorStop(0,'#ffffff');bg.addColorStop(1,'#9aa2ab');
+  ctx.fillStyle=bg;ctx.beginPath();ctx.arc(cx,cy,16,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#7a828a';
+  [[-5,-2],[3,-5],[5,4],[-3,6],[0,0]].forEach(o=>{ctx.beginPath();ctx.arc(cx+o[0],cy+o[1],1.6,0,Math.PI*2);ctx.fill();});
+  // cursor triángulo en el valor actual
   if(G.meter){
-    const cap=powerCap();
-    const cy=gy+gh-(Math.min(G.meter.p,cap)/cap)*gh;
-    ctx.drawImage(SPR[G.gi].head,gx-17,cy-7,14,14);
+    const a=ang(G.meter.p),tx=cx+Math.cos(a)*(R+10),ty=cy+Math.sin(a)*(R+10);
+    ctx.fillStyle='#ffeb3b';
+    ctx.beginPath();ctx.moveTo(tx,ty);
+    ctx.lineTo(tx+Math.cos(a+2.5)*9,ty+Math.sin(a+2.5)*9);
+    ctx.lineTo(tx+Math.cos(a-2.5)*9,ty+Math.sin(a-2.5)*9);
+    ctx.closePath();ctx.fill();
   }
+  // marcas 100% / 50%
+  ctx.fillStyle='#fff';ctx.font='8px "Press Start 2P",monospace';ctx.textAlign='center';
+  ctx.fillText('100%',cx,cy-R-20);
+  ctx.fillText('50%',cx-R-24,cy+3);
+  ctx.fillStyle='#ffeb3b';
+  ctx.beginPath();ctx.moveTo(cx,cy-R-14);ctx.lineTo(cx-5,cy-R-22);ctx.lineTo(cx+5,cy-R-22);ctx.closePath();ctx.fill();
+  // panel LOW/NICE/HIGH
+  const px=cx+R+8,prow=(H-58-(H-178))/3;
+  const rows=[['LOW',0],['NICE',1],['HIGH',2]];
+  let hi=-1;
+  if(G.meter&&G.meter.phase==='height'){
+    const p=G.meter.p,sw=heightSweet(),rz=redZone(G.meter.lie);
+    hi=Math.abs(p-0.5)<sw?1:(p<rz||p>1-rz?(p>0.5?0:2):-1);
+  }
+  rows.forEach((r,i)=>{
+    const ry=H-178+i*prow;
+    ctx.fillStyle=i===hi?(i===1?'#00c853':'#d32f2f'):'#1e50d8';
+    ctx.fillRect(px,ry,54,prow-3);
+    ctx.fillStyle='#fff';ctx.font='10px "Press Start 2P",monospace';
+    ctx.fillText(r[0],px+27,ry+prow/2+3);
+  });
+  // % + palo debajo del dial
+  ctx.fillStyle='#ffd23f';ctx.font=F;
+  let sub=CLUBS[G.clubIndex].id;
+  if(G.meter)sub+=' '+(G.meter.phase==='power'?G.meter.p*100:G.meter.power*100).toFixed(0)+'%';
+  else if(lieAt(G.ball.x,G.ball.y)==='green')sub+=' '+puttNeed().toFixed(2);
+  ctx.fillText(sub,cx,cy+R+22);
   ctx.textAlign='left';
 }
 function drawTopInfo(){
@@ -1281,7 +1312,7 @@ function drawTopInfo(){
   ctx.fillStyle='#fff';ctx.font='8px "Press Start 2P",monospace';
   ctx.fillText('1 PLAYER · STROKE PLAY',12,24);
   ctx.fillStyle='#ffeb3b';ctx.font='12px "Press Start 2P",monospace';
-  ctx.fillText('REST '+d.toFixed(0)+'Y',12,44);
+  ctx.fillText(onGreen(G.ball.x,G.ball.y)?'REST '+(d*0.914).toFixed(1)+'m':'REST '+d.toFixed(0)+'Y',12,44);
   ctx.textAlign='left';
 }
 function drawStatusBar(){
