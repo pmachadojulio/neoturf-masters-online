@@ -49,7 +49,7 @@ import * as THREE from 'three';
 // ---------- 1. DATOS ----------
 const GOLFERS = [
   {name:'GEORGE SPINNER', nick:'YOUNG HERO', ctry:'USA', drv:3, acc:3, skl:3, rec:3, put:3,
-   shirt:'#7a8b3d', dark:'#5a6b2d', pants:'#3d3d3d', skin:'#f0c090', hair:'#5a3a1a', feat:'sidepart'},
+   shirt:'#7a8b3d', dark:'#5a6b2d', pants:'#c9b896', skin:'#f0c090', hair:'#5a3a1a', feat:'sidepart'},
   {name:'DARIO MAGGI', nick:'TECHNICIAN', ctry:'ARG', drv:2, acc:4, skl:5, rec:4, put:3,
    shirt:'#3d6b8b', dark:'#2d4b63', pants:'#222', skin:'#f0c8a0', hair:'#d8b83d', feat:'glasses'},
   {name:'FRANK ADAMS', nick:'VETERAN', ctry:'AUS', drv:1, acc:2, skl:4, rec:5, put:2,
@@ -76,18 +76,18 @@ const HOLES = [
    green:{rx:20,ry:15,tilt:{x:0.55,y:-0.35}},
    bunkers:[{x:300,y:-18,rx:16,ry:9},{x:352,y:52,rx:14,ry:8}],
    water:[{x:200,y:70,rx:70,ry:26}],
-   cliffs:[{x:250,y:-80,rx:95,ry:24}],
+   cliffs:[{x:250,y:-80,rx:55,ry:18}],
    trees:[{x:150,y:-55,t:'pine'},{x:250,y:60,t:'oak'},{x:330,y:-45,t:'pine'},{x:120,y:50,t:'palm'}]},
   {par:3, tee:{x:0,y:0}, pin:{x:175,y:-20}, fairwayW:40,
    green:{rx:16,ry:13,tilt:{x:-0.5,y:0.45}},
    bunkers:[{x:150,y:2,rx:18,ry:10},{x:190,y:-42,rx:12,ry:7}],
    water:[], trees:[{x:90,y:45,t:'oak'},{x:210,y:35,t:'pine'}],
-   cliffs:[{x:120,y:-72,rx:85,ry:20}]},
+   cliffs:[{x:120,y:-72,rx:50,ry:16}]},
   {par:5, tee:{x:0,y:0}, pin:{x:520,y:-40}, fairwayW:50,
    green:{rx:21,ry:15,tilt:{x:0.3,y:0.6}},
    bunkers:[{x:400,y:-70,rx:16,ry:9},{x:480,y:-8,rx:15,ry:8},{x:540,y:-60,rx:13,ry:7}],
    water:[{x:320,y:40,rx:60,ry:24}],
-   cliffs:[{x:360,y:70,rx:80,ry:22},{x:560,y:-90,rx:60,ry:18}],
+   cliffs:[{x:360,y:70,rx:50,ry:16},{x:560,y:-90,rx:40,ry:14}],
    trees:[{x:180,y:-60,t:'palm'},{x:300,y:-55,t:'pine'},{x:450,y:45,t:'oak'},{x:560,y:10,t:'pine'}]},
 ];
 const HS = 0.5; // escala visual de altura
@@ -367,7 +367,7 @@ function nextHole(){
 }
 
 // ---------- 7. ESCENA 3D ----------
-let renderer,scene,camera,courseGroup,ballMesh,shadowMesh,trailLine,golferSprite,golferTex,golferCanvas,
+let renderer,scene,camera,courseGroup,ballMesh,teeMesh,shadowMesh,trailLine,golferSprite,golferTex,golferCanvas,
     aimLine,aimRing,waterMats=[],cloudGroup,slopeArrows=[],flagPennant,lastGolfKey='';
 renderer=new THREE.WebGLRenderer({canvas:c3d,antialias:false});
 renderer.setSize(480,270,false);
@@ -443,6 +443,10 @@ sun.position.set(60,110,40);scene.add(sun);
 ballMesh=new THREE.Mesh(new THREE.SphereGeometry(0.5,14,10),
   new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,emissive:0x777777}));
 scene.add(ballMesh);
+// tee rojo (visible solo en el tee de salida)
+teeMesh=new THREE.Mesh(new THREE.ConeGeometry(0.22,0.7,8),
+  new THREE.MeshLambertMaterial({color:0xc62828}));
+scene.add(teeMesh);
 shadowMesh=new THREE.Mesh(new THREE.CircleGeometry(0.5,16),
   new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.35,depthWrite:false}));
 shadowMesh.rotation.x=-Math.PI/2;scene.add(shadowMesh);
@@ -1095,7 +1099,10 @@ function golfKey(){
 function syncScene(dt){
   // bola + sombra
   const bp=V3(G.ball.x,G.ball.y,G.ball.h||0);
-  ballMesh.position.copy(bp);
+  ballMesh.position.copy(bp);ballMesh.position.y+=0.45;
+  const onTee=lieAt(G.ball.x,G.ball.y)==='tee'&&!G.flight;
+  teeMesh.visible=onTee;
+  if(onTee){teeMesh.position.set(bp.x,0.32,bp.z);}
   ballMesh.visible=!G.holed||G.flight||G.roll||G.putt||true;
   const sh=V3(G.ball.x,G.ball.y,0);
   shadowMesh.position.set(sh.x,0.03,sh.z);
